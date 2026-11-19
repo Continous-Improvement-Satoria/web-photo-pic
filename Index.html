@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <?!= include('Style'); ?>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Mengirim data...<br><small>Mohon tunggu sebentar</small></div>
+</div>
+
+<nav class="nav">
+  <div class="nav-brand">🏭 6S Smart Zone</div>
+  <div class="nav-links">
+    <button class="nav-btn active" id="nav-input" onclick="showView('input')"><span>📝</span> Input PIC</button>
+    <button class="nav-btn" id="nav-output" onclick="showView('output')"><span>📋</span> Output Zona</button>
+  </div>
+</nav>
+
+<main>
+<!-- ============ VIEW INPUT ============ -->
+<section id="view-input" class="view">
+<div class="card">
+  <div class="header">
+    <img src="https://drive.google.com/thumbnail?id=1oi3mSGAZ0LcU02SGEEtKfrzJUfJT6cE1&sz=w500" alt="Logo 6S" class="logo">
+    <h1>Form Pendataan PIC</h1>
+    <div class="sub">PT Satoria · 6S Smart Zone</div>
+  </div>
+
+  <form id="mainForm" onsubmit="return submitForm(event)">
+    <div class="grid2">
+      <div>
+        <label class="req">Plant / Line</label>
+        <select id="plant" required onchange="onPlantChange()"><option value="">-- Pilih Plant --</option></select>
+      </div>
+      <div>
+        <label class="req">Area</label>
+        <select id="area" required onchange="onAreaChange()" disabled><option value="">-- Pilih Area --</option></select>
+        <div class="hint" id="areaLayoutHint"></div>
+      </div>
+    </div>
+
+    <label class="req">Zona</label>
+    <select id="zone" required disabled><option value="">-- Pilih Zona --</option></select>
+    <div class="hint" id="zoneLayoutHint"></div>
+
+    <div class="grid2">
+      <div>
+        <label class="req">Nama PIC</label>
+        <input id="namaPic" type="text" required placeholder="Nama lengkap">
+      </div>
+      <div>
+        <label class="req">NIK</label>
+        <input id="nik" type="text" required inputmode="text" maxlength="20" placeholder="Mis. 331032" pattern="[A-Za-z0-9]{4,20}" title="4-20 karakter huruf/angka tanpa spasi">
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label class="req">Bagian / Departemen</label>
+        <input id="departemen" type="text" required list="deptList" placeholder="Mis. Produksi, QC">
+        <datalist id="deptList">
+          <option>Produksi</option><option>Quality Control</option>
+          <option>Quality Assurance</option><option>Engineering</option>
+          <option>Maintenance</option><option>Utility</option>
+          <option>Warehouse</option><option>General Affairs</option>
+          <option>HSE / K3</option>
+        </datalist>
+      </div>
+      <div>
+        <label class="req">Grup / Shift</label>
+        <select id="grup" required>
+          <option value="">-- Pilih Grup --</option>
+          <option value="A">Grup A</option>
+          <option value="B">Grup B</option>
+          <option value="C">Grup C</option>
+          <option value="D">Grup D</option>
+          <option value="DT">Non Shift (Day Team)</option>
+        </select>
+      </div>
+    </div>
+
+    <label class="req">Foto PIC</label>
+    <div class="photo-btn-group">
+      <label for="fotoPicCamera" class="btn-photo">📷 Kamera</label>
+      <label for="fotoPicGallery" class="btn-photo">🖼️ Galeri</label>
+    </div>
+    <input type="file" id="fotoPicCamera" class="hidden-file" accept="image/*" capture="environment" onchange="handlePhotoSelect(this)">
+    <input type="file" id="fotoPicGallery" class="hidden-file" accept="image/*" onchange="handlePhotoSelect(this)">
+    <img id="previewPic" class="preview">
+    <div id="infoPic" class="info"></div>
+
+    <label>Keterangan</label>
+    <textarea id="keterangan" placeholder="Catatan tambahan (opsional)"></textarea>
+
+    <button type="submit" id="btnSubmit">Kirim Data</button>
+    <div class="msg" id="msg"></div>
+  </form>
+</div>
+</section>
+
+<!-- ============ VIEW OUTPUT ============ -->
+<section id="view-output" class="view" style="display:none">
+<div class="card wide">
+  <div class="header" style="margin-bottom:12px">
+    <h1>Daftar Zona & PIC</h1>
+    <div class="sub">Pilih zona lalu klik Preview untuk melihat papan Area Ownership</div>
+  </div>
+  <div class="toolbar">
+    <select id="fPlant" onchange="renderList()"><option value="">Semua Plant</option></select>
+    <input id="fSearch" type="text" placeholder="Cari area / zona..." oninput="renderList()">
+    <button class="btn-sm" onclick="loadZones(true)">🔄 Refresh</button>
+  </div>
+  <div id="zoneList" class="zone-list"><div class="empty">Memuat...</div></div>
+</div>
+</section>
+</main>
+
+<!-- ============ MODAL PREVIEW ============ -->
+<div id="modal" class="modal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-bar">
+      <b id="modalTitle">Preview</b>
+      <div>
+        <button class="btn-sm" id="btnDl" onclick="downloadBoard()">⬇️ Unduh</button>
+        <button class="btn-sm ghost" onclick="closeModal()">✖ Tutup</button>
+      </div>
+    </div>
+    <div class="board-wrap" id="boardWrap"><div id="board"></div></div>
+  </div>
+</div>
+
+<?!= include('JavaScript'); ?>
+</body>
+</html>

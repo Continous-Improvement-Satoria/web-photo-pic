@@ -1,0 +1,400 @@
+<script>
+let MASTER = { plants: [], areas: [], zones: [] };
+let GPS = { lat: '', lng: '' };
+let COMPRESSED_PIC = null, ZONES = [], CUR = null;
+const TARGET_KB = 200;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const GROUPS = [
+  { k: 'A', n: 'GROUP A', c: '#1f5a8a' }, { k: 'B', n: 'GROUP B', c: '#1e8a4c' },
+  { k: 'C', n: 'GROUP C', c: '#e8651a' }, { k: 'D', n: 'GROUP D', c: '#7b3fa0' }
+];
+
+/* ---------- INIT ---------- */
+window.addEventListener('load', () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      p => { GPS.lat = p.coords.latitude.toFixed(7); GPS.lng = p.coords.longitude.toFixed(7); },
+      () => {}, { enableHighAccuracy: true, timeout: 8000 });
+  }
+  google.script.run
+    .withSuccessHandler(data => {
+      MASTER = data;
+      const sel = $('plant');
+      sel.innerHTML = '<option value="">-- Pilih Plant --</option>';
+      data.plants.forEach(p => sel.add(new Option(p.name, p.id)));
+    })
+    .withFailureHandler(e => showMsg('Gagal memuat data Plant: ' + e.message, false))
+    .getMasterData();
+  window.addEventListener('resize', fitBoard);
+});
+
+/* ---------- NAV ---------- */
+function showView(v) {
+  ['input', 'output'].forEach(x => {
+    $('view-' + x).style.display = x === v ? 'flex' : 'none';
+    $('nav-' + x).classList.toggle('active', x === v);
+  });
+  if (v === 'output' && !ZONES.length) loadZones();
+  window.scrollTo(0, 0);
+}
+
+/* ---------- FORM: DROPDOWN ---------- */
+function onPlantChange() {
+  const pid = $('plant').value;
+  const areaSel = $('area'), zoneSel = $('zone');
+  areaSel.innerHTML = '<option value="">-- Pilih Area --</option>';
+  zoneSel.innerHTML = '<option value="">-- Pilih Zona --</option>';
+  zoneSel.disabled = true;
+  $('areaLayoutHint').textContent = ''; $('zoneLayoutHint').textContent = '';
+  if (!pid) { areaSel.disabled = true; return; }
+  MASTER.areas.filter(a => a.groupId === pid).forEach(a => areaSel.add(new Option(`${a.id} — ${a.name}`, a.id)));
+  areaSel.disabled = false;
+}
+
+function onAreaChange() {
+  const aid = $('area').value;
+  const zoneSel = $('zone');
+  zoneSel.innerHTML = '<option value="">-- Pilih Zona --</option>';
+  $('zoneLayoutHint').textContent = '';
+  $('areaLayoutHint').textContent = '';
+  if (!aid) { zoneSel.disabled = true; return; }
+  const area = MASTER.areas.find(a => a.id === aid);
+  if (area && area.layoutUrl) $('areaLayoutHint').innerHTML = `📐 <a href="${esc(area.layoutUrl)}" target="_blank">Lihat layout area</a>`;
+  MASTER.zones.filter(z => z.areaId === aid).forEach(z => {
+    const o = new Option(`${z.id} — ${z.name}`, z.id);
+    o.dataset.layout = z.layoutUrl || '';
+    zoneSel.add(o);
+  });
+  zoneSel.disabled = false;
+}
+
+$('zone').addEventListener('change', e => {
+  const url = e.target.selectedOptions[0]?.dataset.layout;
+  $('zoneLayoutHint').innerHTML = url ? `📐 <a href="${esc(url)}" target="_blank">Lihat layout zona</a>` : '';
+});
+
+/* ---------- FORM: FOTO ---------- */
+async function handlePhotoSelect(input) {
+  if (!input.files || !input.files.length) return;
+  const file = input.files[0];
+  const img = $('previewPic'), info = $('infoPic');
+  info.style.display = 'block'; info.style.color = '#0a7'; info.textContent = 'Mengompres...';
+  img.style.display = 'none';
+  try {
+    const result = await compressToTargetSize(file, TARGET_KB);
+    COMPRESSED_PIC = result;
+    img.src = result.data; img.style.display = 'block';
+    info.textContent = `✅ ${result.sizeKB} KB (Siap dikirim)`;
+    $('fotoPicCamera').value = ''; $('fotoPicGallery').value = '';
+  } catch (e) {
+    info.textContent = '❌ ' + e.message; info.style.color = '#d33';
+    COMPRESSED_PIC = null;
+  }
+}
+
+async function compressToTargetSize(file, targetKB = 200, maxDim = 1280) {
+  const targetBytes = targetKB * 1024;
+  const img = await loadImage(file);
+  for (const dim of [maxDim, 960, 720, 540, 400]) {
+    const { w, h } = fitDimensions(img.width, img.height, dim);
+    const canvas = drawToCanvas(img, w, h);
+    let lo = 0.30, hi = 0.90, best = null;
+    for (let i = 0; i < 7; i++) {
+      const q = (lo + hi) / 2;
+      const dataUrl = canvas.toDataURL('image/jpeg', q);
+      const bytes = dataUrl.length * 0.75;
+      if (bytes <= targetBytes) { best = { dataUrl, q, bytes }; lo = q; } else { hi = q; }
+    }
+    if (best) return { data: best.dataUrl, mimeType: 'image/jpeg', sizeKB: Math.round(best.bytes / 1024) };
+  }
+  throw new Error('Gagal kompres di bawah ' + targetKB + ' KB.');
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+function fitDimensions(w, h, maxDim) {
+  if (w <= maxDim && h <= maxDim) return { w, h };
+  if (w >= h) return { w: maxDim, h: Math.round(h * maxDim / w) };
+  return { w: Math.round(w * maxDim / h), h: maxDim };
+}
+function drawToCanvas(img, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(img, 0, 0, w, h);
+  return c;
+}
+
+/* ---------- FORM: SUBMIT ---------- */
+function submitForm(ev) {
+  ev.preventDefault();
+  if (!COMPRESSED_PIC) { showMsg('Pastikan Foto PIC sudah dipilih dan selesai diproses.', false); return false; }
+
+  const btn = $('btnSubmit');
+  btn.disabled = true;
+  $('loadingText').innerHTML = 'Mengirim data...<br><small>Mohon tunggu sebentar</small>';
+  $('loadingOverlay').style.display = 'flex';
+
+  const plantSel = $('plant'), areaSel = $('area'), zoneSel = $('zone');
+  const payload = {
+    plant: plantSel.value,
+    plantName: plantSel.selectedOptions[0].textContent,
+    areaId: areaSel.value,
+    areaName: areaSel.selectedOptions[0].textContent,
+    zoneId: zoneSel.value,
+    zoneName: zoneSel.selectedOptions[0].textContent,
+    namaPic: $('namaPic').value.trim(),
+    nik: $('nik').value.trim(),
+    departemen: $('departemen').value.trim(),
+    grup: $('grup').value,
+    keterangan: $('keterangan').value.trim(),
+    fotoPic: COMPRESSED_PIC,
+    gpsLat: GPS.lat, gpsLng: GPS.lng,
+    userAgent: navigator.userAgent
+  };
+
+  google.script.run
+    .withSuccessHandler(r => {
+      $('loadingOverlay').style.display = 'none';
+      showMsg(r.message, true); resetForm(); btn.disabled = false;
+      ZONES = []; // paksa muat ulang daftar output
+    })
+    .withFailureHandler(e => {
+      $('loadingOverlay').style.display = 'none';
+      showMsg('Gagal: ' + e.message, false); btn.disabled = false;
+    })
+    .submitForm(payload);
+  return false;
+}
+
+function resetForm() {
+  $('mainForm').reset();
+  COMPRESSED_PIC = null;
+  $('previewPic').style.display = 'none';
+  $('infoPic').style.display = 'none';
+  $('area').disabled = true; $('zone').disabled = true;
+  $('areaLayoutHint').textContent = ''; $('zoneLayoutHint').textContent = '';
+}
+
+function showMsg(text, ok) {
+  const m = $('msg');
+  m.textContent = text;
+  m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+/* ---------- OUTPUT: DAFTAR ZONA ---------- */
+function loadZones(force) {
+  $('zoneList').innerHTML = '<div class="empty">Memuat...</div>';
+  google.script.run
+    .withSuccessHandler(z => {
+      ZONES = z;
+      const f = $('fPlant'), cur = f.value;
+      f.innerHTML = '<option value="">Semua Plant</option>';
+      [...new Map(z.map(x => [x.plantId, x.plantName]))].forEach(([id, n]) => f.add(new Option(n, id)));
+      f.value = cur;
+      renderList();
+    })
+    .withFailureHandler(e => $('zoneList').innerHTML = `<div class="empty">Gagal memuat: ${esc(e.message)}</div>`)
+    .getZoneList();
+}
+
+function renderList() {
+  const p = $('fPlant').value, q = $('fSearch').value.toLowerCase().trim();
+  const list = ZONES.filter(z => (!p || z.plantId === p) &&
+    (!q || (z.areaName + ' ' + z.zoneName + ' ' + z.zoneId + ' ' + z.areaId).toLowerCase().includes(q)));
+  $('zoneList').innerHTML = list.length ? list.map(z => `
+    <div class="zone-item">
+      <div class="zt">${esc(z.zoneId)} — ${esc(z.zoneName)}</div>
+      <div class="zs">${esc(z.plantName)} · ${esc(z.areaId)} — ${esc(z.areaName)}</div>
+      <span class="badge ${z.count ? '' : 'none'}">${z.count ? z.count + ' PIC terdata' : 'Belum ada PIC'}</span>
+      <button class="btn-sm" onclick="openBoard('${esc(z.zoneId)}')"> Preview</button>
+    </div>`).join('') : '<div class="empty">Tidak ada zona.</div>';
+}
+
+/* ---------- OUTPUT: PAPAN ---------- */
+function openBoard(zoneId) {
+  $('loadingText').innerHTML = 'Memuat papan...<br><small>Mengambil foto dari Drive</small>';
+  $('loadingOverlay').style.display = 'flex';
+  google.script.run
+    .withSuccessHandler(d => {
+      $('loadingOverlay').style.display = 'none';
+      CUR = d;
+      console.log('BOARD', d.pics.map(p => ({ nama: p.name, grup: p.grup, foto: !!p.photo, err: p.err })));
+      $('modalTitle').textContent = `${d.info.zoneId} — ${d.info.zoneName}`;
+      $('board').innerHTML = buildBoard(d);
+      $('modal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      setTimeout(fitBoard, 30);
+    })
+    .withFailureHandler(e => { $('loadingOverlay').style.display = 'none'; alert('Gagal: ' + e.message); })
+    .getZoneBoard(zoneId);
+}
+
+function closeModal() { $('modal').style.display = 'none'; document.body.style.overflow = ''; }
+
+function fitBoard() {
+  const b = $('board'), w = $('boardWrap');
+  if (!b || $('modal').style.display === 'none') return;
+  b.style.transform = 'none';
+  const s = Math.min(1, w.clientWidth / 1200);
+  b.style.transform = `scale(${s})`;
+  w.style.height = Math.ceil(b.offsetHeight * s) + 'px';
+}
+
+function picCard(p) {
+  return `<div class="pic">
+    ${p.photo ? `<img class="ph" src="${p.photo}">` : '<div class="ph"></div>'}
+    <div class="nm">${esc(p.name)}</div>
+    <div class="id"style="color:#c62828">${p.nik ? `NIK: ${esc(p.nik)}` : 'NIK belum terisi'}</div>
+    <div class="dp">${esc(p.dept)}</div>
+    ${!p.photo && p.err ? `<div class="dp" style="color:#c62828">Foto gagal: ${esc(p.err).substring(0, 80)}</div>` : ''}</div>`;
+}
+
+function buildBoard(d) {
+  const i = d.info;
+  const cols = GROUPS.map(g => {
+    const ps = d.pics.filter(p => p.grup === g.k);
+    return `<div class="bd-col" style="--gc:${g.c}"><h3>${g.n}</h3>
+      <div class="bd-body">${ps.length ? ps.map(picCard).join('') : '<div class="bd-none">Belum ada PIC</div>'}</div></div>`;
+  }).join('');
+  const day = d.pics.filter(p => p.grup === 'DT');
+  const upd = d.updated ? new Date(d.updated).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
+  return `
+    <div class="bd-head">
+      <div><h2>AREA OWNERSHIP &amp; RESPONSIBILITY</h2><span class="bd-tag">OUR AREA · OUR RESPONSIBILITY · OUR PRIDE</span></div>
+      <div class="bd-badge">6S WORKPLACE<br>MANAGEMENT</div>
+    </div>
+    <div class="bd-zone">${esc(i.plantName)} · ${esc(i.areaName)} · ${esc(i.zoneName)}</div>
+    <div class="bd-groups">${cols}</div>
+    <div class="bd-low">
+      <div class="bd-day"><h3>NON SHIFT (DAY TEAM)</h3>
+        <div class="row">${day.length ? day.map(picCard).join('') : '<div class="bd-none" style="width:100%">Belum ada PIC</div>'}</div></div>
+      <div class="bd-info"><b>INFO ZONA</b>
+        Plant: ${esc(i.plantName)}<br>Area: ${esc(i.areaName)}<br>Zona: ${esc(i.zoneName)}<br>Update: ${upd}</div>
+    </div>
+    <div class="bd-foot"><span><b>SEIRI</b> RINGKAS</span><span><b>SEITON</b> RAPI</span><span><b>SEISO</b> RESIK</span>
+      <span><b>SEIKETSU</b> RAWAT</span><span><b>SHITSUKE</b> RAJIN</span><span><b>SAFETY</b> SELAMAT</span></div>`;
+}
+
+
+/* ============================================
+   CETAK PREVIEW LANGSUNG KE PDF F4
+   Tidak menggunakan canvas atau jsPDF
+   Tidak menggambar ulang foto
+   ============================================ */
+
+function downloadBoard() {
+
+  if (!CUR) {
+    alert('Silakan buka preview zona terlebih dahulu.');
+    return;
+  }
+
+  const board = document.getElementById('board');
+
+  if (!board) {
+    alert('Poster tidak ditemukan.');
+    return;
+  }
+
+  // Pastikan semua foto telah dimuat
+  const images = Array.from(
+    board.querySelectorAll('img')
+  );
+
+  const failed = images.filter(img =>
+    !img.complete || img.naturalWidth === 0
+  );
+
+  if (failed.length > 0) {
+    alert(
+      'Ada foto yang belum selesai dimuat. ' +
+      'Silakan coba kembali.'
+    );
+    return;
+  }
+
+  // Ukuran F4 dalam mm
+  const pageWidth = 210;
+  const pageHeight = 330;
+  const margin = 5;
+
+  // Ukuran board asli sebelum transform preview
+  const boardWidth = board.offsetWidth;
+  const boardHeight = board.scrollHeight;
+
+  if (!boardWidth || !boardHeight) {
+    alert('Ukuran poster tidak valid.');
+    return;
+  }
+
+  // Konversi mm ke CSS pixel
+  const mmToPx = 96 / 25.4;
+
+  const availableWidth =
+    (pageWidth - margin * 2) * mmToPx;
+
+  const availableHeight =
+    (pageHeight - margin * 2) * mmToPx;
+
+  // Skala seragam agar seluruh poster
+  // masuk ke satu halaman F4
+  const scale = Math.min(
+    availableWidth / boardWidth,
+    availableHeight / boardHeight,
+    1
+  ) * 0.98;
+
+  // Atur hanya skala CETAK
+  // Preview tetap seperti sebelumnya
+  document.documentElement.style.setProperty(
+    '--f4-board-width',
+    boardWidth + 'px'
+  );
+
+  document.documentElement.style.setProperty(
+    '--f4-board-scale',
+    String(scale)
+  );
+
+  // Pastikan style cetak telah diproses
+  void board.offsetHeight;
+
+  // Cetak DOM asli menggunakan browser
+  window.print();
+}
+
+
+
+function cekLibraryPDF() {
+  const html2canvasOK =
+    typeof window.html2canvas === 'function';
+
+  const jsPDFOK =
+    typeof window.jspdf !== 'undefined' &&
+    typeof window.jspdf.jsPDF === 'function';
+
+  console.log('html2canvas:', html2canvasOK);
+  console.log('jsPDF:', jsPDFOK);
+
+  if (!html2canvasOK || !jsPDFOK) {
+    alert(
+      'Library PDF belum lengkap:\n' +
+      'html2canvas: ' + html2canvasOK + '\n' +
+      'jsPDF: ' + jsPDFOK
+    );
+    return;
+  }
+
+  alert('Library PDF siap digunakan!');
+}
+
+
+</script>
