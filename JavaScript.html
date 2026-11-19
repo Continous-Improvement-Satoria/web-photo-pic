@@ -31,10 +31,11 @@ window.addEventListener('load', () => {
 
 /* ---------- NAV ---------- */
 function showView(v) {
-  ['input', 'output'].forEach(x => {
+  ['input', 'jobdesk', 'output'].forEach(x => {
     $('view-' + x).style.display = x === v ? 'flex' : 'none';
     $('nav-' + x).classList.toggle('active', x === v);
   });
+  if (v === 'jobdesk' && typeof initJobdesk === 'function') initJobdesk();
   if (v === 'output' && !ZONES.length) loadZones();
   window.scrollTo(0, 0);
 }

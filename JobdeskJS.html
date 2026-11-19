@@ -1,0 +1,339 @@
+<script>
+let JD_MASTER = { plants: [], areas: [], zones: [] };
+let JD_ITEMS = [];
+let JD_LOADED = false;
+let JD_EDIT = null;
+
+const JD_CATS = [
+  { k: 'RINGKAS', en: 'Seiri' },
+  { k: 'RAPI', en: 'Seiton' },
+  { k: 'RESIK', en: 'Seiso' },
+  { k: 'RAWAT', en: 'Seiketsu' },
+  { k: 'RAJIN', en: 'Shitsuke' },
+  { k: 'SAFETY', en: 'Safety' }
+];
+const JD_GROUPS = { A: 'Grup A', B: 'Grup B', C: 'Grup C', D: 'Grup D', DT: 'Day Team' };
+
+function initJobdesk() {
+  jdBuildStatic();
+  jdEnsureMaster(() => {
+    jdFillPlant();
+    jdFillFilters();
+    if (!JD_LOADED) jdLoadList();
+  });
+}
+
+function jdEnsureMaster(cb) {
+  if (JD_MASTER.plants.length) { cb(); return; }
+  if (typeof MASTER !== 'undefined' && MASTER && MASTER.plants && MASTER.plants.length) {
+    JD_MASTER = MASTER;
+    cb();
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(d => {
+      JD_MASTER = d || { plants: [], areas: [], zones: [] };
+      cb();
+    })
+    .withFailureHandler(e => jdShow('Gagal memuat data master: ' + e.message, false))
+    .getMasterData();
+}
+
+function jdBuildStatic() {
+  if ($('jdSections').childElementCount) return;
+  $('jdSections').innerHTML = JD_CATS.map(c => `
+    <div class="jd-section" data-cat="${c.k}">
+      <div class="jd-section-head">
+        <span class="cat-badge cat-${c.k.toLowerCase()}">${c.k}</span>
+        <span class="jd-cat-sub">${c.en}</span>
+      </div>
+      <div class="jd-rows"></div>
+      <button class="btn-sm ghost" type="button" onclick="jdAddRow('${c.k}')">+ Tambah Jobdesk</button>
+    </div>`).join('');
+  JD_CATS.forEach(c => jdAddRow(c.k));
+  $('jdFilterCat').innerHTML = '<option value="">Semua Kategori</option>' +
+    JD_CATS.map(c => `<option value="${c.k}">${c.k}</option>`).join('');
+  $('jdEditCat').innerHTML = JD_CATS.map(c => `<option value="${c.k}">${c.k}</option>`).join('');
+}
+
+function jdAddRow(cat, value) {
+  const wrap = document.querySelector(`#jdSections .jd-section[data-cat="${cat}"] .jd-rows`);
+  if (!wrap) return;
+  const row = document.createElement('div');
+  row.className = 'jd-row';
+  const ta = document.createElement('textarea');
+  ta.maxLength = 1000;
+  ta.rows = 2;
+  ta.placeholder = 'Tulis jobdesk...';
+  ta.value = value || '';
+  ta.oninput = () => jdAutoGrow(ta);
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'jd-del';
+  del.title = 'Hapus baris';
+  del.textContent = '✕';
+  del.onclick = () => row.remove();
+  row.appendChild(ta);
+  row.appendChild(del);
+  wrap.appendChild(row);
+  jdAutoGrow(ta);
+}
+
+function jdAutoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.max(44, el.scrollHeight) + 'px';
+}
+
+function jdResetRows() {
+  document.querySelectorAll('#jdSections .jd-rows').forEach(w => { w.innerHTML = ''; });
+  JD_CATS.forEach(c => jdAddRow(c.k));
+}
+
+function jdFillPlant() {
+  const sel = $('jdPlant');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- Pilih Plant --</option>';
+  JD_MASTER.plants.forEach(p => sel.add(new Option(p.name, p.id)));
+  sel.value = cur;
+}
+
+function jdFillFilters() {
+  const f = $('jdFilterPlant');
+  const cur = f.value;
+  f.innerHTML = '<option value="">Semua Plant</option>';
+  JD_MASTER.plants.forEach(p => f.add(new Option(p.name, p.name)));
+  f.value = cur;
+}
+
+function jdOnPlantChange() {
+  const pid = $('jdPlant').value;
+  const areaSel = $('jdArea'), zoneSel = $('jdZone');
+  areaSel.innerHTML = '<option value="">-- Pilih Area --</option>';
+  zoneSel.innerHTML = '<option value="">-- Pilih Zona --</option>';
+  zoneSel.disabled = true;
+  if (!pid) { areaSel.disabled = true; return; }
+  JD_MASTER.areas.filter(a => a.groupId === pid).forEach(a => areaSel.add(new Option(`${a.id} — ${a.name}`, a.id)));
+  areaSel.disabled = false;
+}
+
+function jdOnAreaChange() {
+  const aid = $('jdArea').value;
+  const zoneSel = $('jdZone');
+  zoneSel.innerHTML = '<option value="">-- Pilih Zona --</option>';
+  if (!aid) { zoneSel.disabled = true; return; }
+  JD_MASTER.zones.filter(z => z.areaId === aid).forEach(z => zoneSel.add(new Option(`${z.id} — ${z.name}`, z.id)));
+  zoneSel.disabled = false;
+}
+
+function jdCollectItems() {
+  const items = [];
+  document.querySelectorAll('#jdSections .jd-section').forEach(sec => {
+    const category = sec.dataset.cat;
+    sec.querySelectorAll('.jd-row textarea').forEach(t => {
+      const description = String(t.value || '').trim();
+      if (description) items.push({ category: category, description: description });
+    });
+  });
+  return items;
+}
+
+function jdSubmit(ev) {
+  if (ev) ev.preventDefault();
+  const plantId = $('jdPlant').value;
+  const areaId = $('jdArea').value;
+  const zoneId = $('jdZone').value;
+  if (!plantId || !areaId || !zoneId) {
+    jdShow('Lengkapi Plant, Area, dan Zona terlebih dahulu.', false);
+    return false;
+  }
+  const nik = $('jdNik').value.trim();
+  if (!/^[A-Za-z0-9]{4,20}$/.test(nik)) {
+    jdShow('NIK harus 4-20 karakter huruf/angka tanpa spasi.', false);
+    return false;
+  }
+  if (!$('jdNamaPic').value.trim()) {
+    jdShow('Nama PIC wajib diisi.', false);
+    return false;
+  }
+  if (!$('jdGrup').value) {
+    jdShow('Pilih Grup / Shift.', false);
+    return false;
+  }
+  const items = jdCollectItems();
+  if (!items.length) {
+    jdShow('Isi minimal satu jobdesk.', false);
+    return false;
+  }
+  if (items.some(it => it.description.length > 1000)) {
+    jdShow('Setiap jobdesk maksimal 1000 karakter.', false);
+    return false;
+  }
+
+  const plant = JD_MASTER.plants.find(p => p.id === plantId);
+  const area = JD_MASTER.areas.find(a => a.id === areaId);
+  const zone = JD_MASTER.zones.find(z => z.id === zoneId);
+  const payload = {
+    plantName: plant ? plant.name : $('jdPlant').selectedOptions[0].textContent,
+    areaId: areaId,
+    areaName: area ? area.name : $('jdArea').selectedOptions[0].textContent,
+    zoneId: zoneId,
+    zoneName: zone ? zone.name : $('jdZone').selectedOptions[0].textContent,
+    namaPic: $('jdNamaPic').value.trim(),
+    nik: nik,
+    grup: $('jdGrup').value,
+    items: items
+  };
+
+  const btn = $('jdBtnSave');
+  btn.disabled = true;
+  $('loadingText').innerHTML = 'Menyimpan jobdesk...<br><small>Mohon tunggu sebentar</small>';
+  $('loadingOverlay').style.display = 'flex';
+
+  google.script.run
+    .withSuccessHandler(r => {
+      $('loadingOverlay').style.display = 'none';
+      btn.disabled = false;
+      jdShow(r.message, true);
+      jdResetRows();
+      jdLoadList(true);
+    })
+    .withFailureHandler(e => {
+      $('loadingOverlay').style.display = 'none';
+      btn.disabled = false;
+      jdShow('Gagal: ' + e.message, false);
+    })
+    .saveJobdeskBatch(payload);
+  return false;
+}
+
+function jdShow(text, ok) {
+  const m = $('jdMsg');
+  m.textContent = text;
+  m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function jdLoadList(force) {
+  $('jdList').innerHTML = '<div class="empty">Memuat...</div>';
+  $('jdCount').textContent = '';
+  google.script.run
+    .withSuccessHandler(items => {
+      JD_ITEMS = Array.isArray(items) ? items : [];
+      JD_LOADED = true;
+      jdRenderList();
+    })
+    .withFailureHandler(e => {
+      $('jdList').innerHTML = `<div class="empty">Gagal memuat jobdesk: ${esc(e.message)}</div>`;
+    })
+    .getJobdeskList();
+}
+
+function jdRenderList() {
+  const fp = $('jdFilterPlant').value;
+  const fc = $('jdFilterCat').value;
+  const q = $('jdSearch').value.toLowerCase().trim();
+  const list = JD_ITEMS
+    .filter(it => (!fp || it.plant === fp) && (!fc || it.category === fc))
+    .filter(it => !q || [it.description, it.plant, it.areaId, it.areaName, it.zoneId, it.zoneName, it.picName, it.nik, it.group]
+      .join(' ').toLowerCase().includes(q))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  $('jdCount').textContent = list.length + ' jobdesk';
+  if (!list.length) {
+    $('jdList').innerHTML = '<div class="empty">Belum ada jobdesk sesuai filter.</div>';
+    return;
+  }
+  $('jdList').innerHTML = `<div class="jd-table-wrap"><table class="jd-table">
+    <thead><tr><th>Kategori</th><th>Jobdesk</th><th>Plant</th><th>Area</th><th>Zona</th><th>PIC</th><th>Aksi</th></tr></thead>
+    <tbody>${list.map(jdRowHtml).join('')}</tbody></table></div>`;
+}
+
+function jdRowHtml(it) {
+  const cat = String(it.category || '').toUpperCase();
+  const upd = it.updatedAt ? new Date(it.updatedAt).toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  }) : '-';
+  return `<tr>
+    <td><span class="cat-badge cat-${esc(cat.toLowerCase())}">${esc(cat)}</span><div class="jd-sub">${esc(upd)}</div></td>
+    <td class="jd-desc">${esc(it.description)}</td>
+    <td>${esc(it.plant)}</td>
+    <td>${esc(it.areaId)} — ${esc(it.areaName)}</td>
+    <td>${esc(it.zoneId)} — ${esc(it.zoneName)}</td>
+    <td><b>${esc(it.picName)}</b><div class="jd-sub">NIK ${esc(it.nik)} · ${esc(JD_GROUPS[it.group] || it.group)}</div></td>
+    <td><div class="jd-actions">
+      <button class="btn-sm ghost" type="button" onclick="jdOpenEdit('${esc(it.id)}')">Edit</button>
+      <button class="btn-sm danger" type="button" onclick="jdDelete('${esc(it.id)}')">Hapus</button>
+    </div></td>
+  </tr>`;
+}
+
+function jdOpenEdit(id) {
+  const it = JD_ITEMS.find(x => x.id === id);
+  if (!it) return;
+  JD_EDIT = it;
+  $('jdEditCat').value = it.category;
+  $('jdEditDesc').value = it.description;
+  $('jdEditMsg').className = 'msg';
+  $('jdEditMsg').textContent = '';
+  $('jdBtnEditSave').disabled = false;
+  $('jdModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function jdCloseEdit() {
+  $('jdModal').style.display = 'none';
+  document.body.style.overflow = '';
+  JD_EDIT = null;
+}
+
+function jdEditShow(text, ok) {
+  const m = $('jdEditMsg');
+  m.textContent = text;
+  m.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function jdSaveEdit() {
+  if (!JD_EDIT) return;
+  const category = $('jdEditCat').value;
+  const description = $('jdEditDesc').value.trim();
+  if (!description) { jdEditShow('Jobdesk wajib diisi.', false); return; }
+  if (description.length > 1000) { jdEditShow('Jobdesk maksimal 1000 karakter.', false); return; }
+
+  const it = JD_EDIT;
+  const btn = $('jdBtnEditSave');
+  btn.disabled = true;
+  google.script.run
+    .withSuccessHandler(() => {
+      jdCloseEdit();
+      jdShow('Jobdesk berhasil diperbarui.', true);
+      jdLoadList(true);
+    })
+    .withFailureHandler(e => {
+      btn.disabled = false;
+      jdEditShow('Gagal: ' + e.message, false);
+    })
+    .updateJobdeskItem({
+      id: it.id,
+      plantName: it.plant,
+      areaId: it.areaId,
+      areaName: it.areaName,
+      zoneId: it.zoneId,
+      zoneName: it.zoneName,
+      namaPic: it.picName,
+      nik: it.nik,
+      grup: it.group,
+      category: category,
+      description: description
+    });
+}
+
+function jdDelete(id) {
+  if (!confirm('Hapus jobdesk ini?')) return;
+  google.script.run
+    .withSuccessHandler(r => {
+      jdShow(r.message, true);
+      jdLoadList(true);
+    })
+    .withFailureHandler(e => jdShow('Gagal: ' + e.message, false))
+    .deleteJobdeskItem(id);
+}
+</script>

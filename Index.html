@@ -21,6 +21,7 @@
   <div class="nav-brand">🏭 6S Smart Zone</div>
   <div class="nav-links">
     <button class="nav-btn active" id="nav-input" onclick="showView('input')"><span>📝</span> Input PIC</button>
+    <button class="nav-btn" id="nav-jobdesk" onclick="showView('jobdesk')"><span>✅</span> Jobdesk 6S</button>
     <button class="nav-btn" id="nav-output" onclick="showView('output')"><span>📋</span> Output Zona</button>
   </div>
 </nav>
@@ -122,6 +123,7 @@
   <div id="zoneList" class="zone-list"><div class="empty">Memuat...</div></div>
 </div>
 </section>
+<?!= include('Jobdesk'); ?>
 </main>
 
 <!-- ============ MODAL PREVIEW ============ -->
@@ -139,5 +141,6 @@
 </div>
 
 <?!= include('JavaScript'); ?>
+<?!= include('JobdeskJS'); ?>
 </body>
 </html>

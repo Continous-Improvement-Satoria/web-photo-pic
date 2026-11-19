@@ -107,6 +107,43 @@
   .bd-foot { background:#0f2a5c; color:#fff; display:flex; justify-content:space-around; padding:14px; font-weight:700; font-size:15px; }
   .bd-foot span b { color:#f5b800; }
 
+  /* JOBDESK 6S */
+  .jd-sections { display:flex; flex-direction:column; gap:12px; margin-top:20px; }
+  .jd-section { border:2px solid var(--border-color); border-radius:12px; padding:12px 14px; background:#f8fbff; }
+  .jd-section-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .jd-cat-sub { font-size:11px; font-weight:700; color:#78909c; text-transform:uppercase; letter-spacing:.5px; }
+  .jd-rows { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+  .jd-row { display:flex; gap:8px; align-items:flex-start; }
+  .jd-row textarea { min-height:44px; resize:vertical; }
+  .jd-del { flex:0 0 auto; width:38px; height:38px; border:2px solid #ef9a9a; border-radius:8px; background:#ffebee;
+    color:#c62828; font-size:15px; font-weight:700; cursor:pointer; }
+  .jd-del:hover { background:#ffcdd2; border-color:#e57373; }
+  .cat-badge { display:inline-block; font-size:11px; font-weight:800; letter-spacing:.4px; padding:4px 10px; border-radius:20px; background:#eceff1; color:#37474f; }
+  .cat-badge.cat-ringkas { background:#e3f2fd; color:#0d47a1; }
+  .cat-badge.cat-rapi { background:#e8f5e9; color:#1b5e20; }
+  .cat-badge.cat-resik { background:#e0f7fa; color:#006064; }
+  .cat-badge.cat-rawat { background:#fff8e1; color:#e65100; }
+  .cat-badge.cat-rajin { background:#f3e5f5; color:#6a1b9a; }
+  .cat-badge.cat-safety { background:#ffebee; color:#b71c1c; }
+  .jd-list-wrap { margin-top:28px; border-top:1px solid var(--bg-color); padding-top:18px; }
+  .jd-list-head h2 { font-size:18px; margin:0 0 10px; }
+  .jd-toolbar { flex-wrap:wrap; margin-bottom:0; }
+  .jd-toolbar select { flex:0 0 160px; }
+  .jd-count { font-size:12px; font-weight:700; color:#546e7a; margin:10px 0 8px; }
+  .jd-table-wrap { overflow-x:auto; border:1px solid var(--border-color); border-radius:10px; }
+  .jd-table { width:100%; border-collapse:collapse; font-size:13px; min-width:860px; }
+  .jd-table th { background:#17365D; color:#fff; padding:10px; text-align:left; font-size:12px; letter-spacing:.3px; white-space:nowrap; }
+  .jd-table td { padding:9px 10px; border-bottom:1px solid #e3ebf4; vertical-align:top; }
+  .jd-table tr:last-child td { border-bottom:none; }
+  .jd-table tbody tr:hover td { background:#f5f9ff; }
+  .jd-desc { max-width:360px; white-space:pre-wrap; }
+  .jd-sub { font-size:11px; color:#78909c; margin-top:3px; }
+  .jd-actions { display:flex; gap:6px; white-space:nowrap; }
+  .btn-sm.danger { background:#d32f2f; }
+  .btn-sm.danger:hover { background:#b71c1c; }
+  .jd-modal-box { max-width:560px; }
+  .jd-modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+
   /* MOBILE */
   @media (max-width:700px) {
     .nav { top:auto; bottom:0; height:60px; padding:0; border-bottom:none; border-top:3px solid var(--primary-color); }
@@ -120,6 +157,12 @@
     .grid2 { grid-template-columns:1fr; }
     .preview { max-height:150px; }
     .toolbar { flex-direction:column; } .toolbar select { flex:none; }
+    .jd-toolbar select { flex:none; }
+    .jd-section { padding:10px; }
+    .jd-row { gap:6px; }
+    .jd-list-head h2 { margin-bottom:10px; }
+    .jd-modal-actions { flex-direction:column; }
+    .jd-modal-actions .btn-sm { width:100%; }
     .modal { padding:6px; } 
   }
 
