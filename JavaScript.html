@@ -6,9 +6,17 @@ const TARGET_KB = 200;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const GROUPS = [
-  { k: 'A', n: 'GROUP A', c: '#1f5a8a' }, { k: 'B', n: 'GROUP B', c: '#1e8a4c' },
-  { k: 'C', n: 'GROUP C', c: '#e8651a' }, { k: 'D', n: 'GROUP D', c: '#7b3fa0' }
+  { k: 'A', n: 'GRUP A', c: '#1f5a8a' }, { k: 'B', n: 'GRUP B', c: '#1e8a4c' },
+  { k: 'C', n: 'GRUP C', c: '#e8651a' }, { k: 'D', n: 'GRUP D', c: '#7b3fa0' }
 ];
+const CAT_LABEL = {
+  RINGKAS: 'RINGKAS', RAPI: 'RAPI', RESIK: 'RESIK',
+  RAWAT: 'RAWAT', RAJIN: 'RAJIN', SAFETY: 'KESELAMATAN'
+};
+function catLabel(k) {
+  const key = String(k || '').toUpperCase();
+  return CAT_LABEL[key] || key;
+}
 
 /* ---------- INIT ---------- */
 window.addEventListener('load', () => {
@@ -31,11 +39,12 @@ window.addEventListener('load', () => {
 
 /* ---------- NAV ---------- */
 function showView(v) {
-  ['input', 'jobdesk', 'output'].forEach(x => {
+  ['input', 'jobdesk', 'output', 'foto'].forEach(x => {
     $('view-' + x).style.display = x === v ? 'flex' : 'none';
     $('nav-' + x).classList.toggle('active', x === v);
   });
   if (v === 'jobdesk' && typeof initJobdesk === 'function') initJobdesk();
+  if (v === 'foto' && typeof initFoto === 'function') initFoto();
   if (v === 'output' && !ZONES.length) loadZones();
   window.scrollTo(0, 0);
 }
@@ -166,6 +175,7 @@ function submitForm(ev) {
       $('loadingOverlay').style.display = 'none';
       showMsg(r.message, true); resetForm(); btn.disabled = false;
       ZONES = []; // paksa muat ulang daftar output
+      if (typeof PIC_LOADED !== 'undefined') { PIC_LOADED = false; PIC_ITEMS = []; }
     })
     .withFailureHandler(e => {
       $('loadingOverlay').style.display = 'none';
@@ -215,7 +225,7 @@ function renderList() {
       <div class="zt">${esc(z.zoneId)} — ${esc(z.zoneName)}</div>
       <div class="zs">${esc(z.plantName)} · ${esc(z.areaId)} — ${esc(z.areaName)}</div>
       <span class="badge ${z.count ? '' : 'none'}">${z.count ? z.count + ' PIC terdata' : 'Belum ada PIC'}</span>
-      <button class="btn-sm" onclick="openBoard('${esc(z.zoneId)}')"> Preview</button>
+      <button class="btn-sm" onclick="openBoard('${esc(z.zoneId)}')">👁️ Pratinjau</button>
     </div>`).join('') : '<div class="empty">Tidak ada zona.</div>';
 }
 
@@ -258,30 +268,60 @@ function picCard(p) {
     ${!p.photo && p.err ? `<div class="dp" style="color:#c62828">Foto gagal: ${esc(p.err).substring(0, 80)}</div>` : ''}</div>`;
 }
 
+function hideGroupD(info) {
+  const pid = String(info.plantId || '').toUpperCase();
+  const pname = String(info.plantName || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  return pid === 'A03' || pname === 'PLANT 3' || pname === 'LINE 3';
+}
+
+function jobdeskBoardHtml(jds) {
+  const rows = jds.map(j => {
+    const cat = String(j.category || '').toUpperCase();
+    return `<div class="jd-board-item">
+      <span class="cat-badge cat-${esc(cat.toLowerCase())}">${esc(catLabel(cat))}</span>
+      <div class="jd-board-desc">${esc(j.description)}</div>
+    </div>`;
+  }).join('');
+  return `<div class="jd-board-list">${rows}</div>`;
+}
+
 function buildBoard(d) {
   const i = d.info;
-  const cols = GROUPS.map(g => {
+  const jds = Array.isArray(d.jobdesks) ? d.jobdesks : [];
+  const groups = GROUPS.filter(g => !(hideGroupD(i) && g.k === 'D'));
+  const cols = groups.map(g => {
     const ps = d.pics.filter(p => p.grup === g.k);
     return `<div class="bd-col" style="--gc:${g.c}"><h3>${g.n}</h3>
       <div class="bd-body">${ps.length ? ps.map(picCard).join('') : '<div class="bd-none">Belum ada PIC</div>'}</div></div>`;
   }).join('');
   const day = d.pics.filter(p => p.grup === 'DT');
+  let dayBox;
+  if (day.length) {
+    dayBox = `<div class="bd-day"><h3>NON SHIFT (TIM HARIAN)</h3>
+      <div class="row">${day.map(picCard).join('')}</div></div>`;
+  } else if (jds.length) {
+    dayBox = `<div class="bd-day bd-day-jd"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>`;
+  } else {
+    dayBox = `<div class="bd-day"><h3>NON SHIFT (TIM HARIAN)</h3>
+      <div class="row"><div class="bd-none" style="width:100%">Belum ada PIC</div></div></div>`;
+  }
+  const extraJd = (day.length && jds.length)
+    ? `<div class="bd-jobdesk"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>` : '';
   const upd = d.updated ? new Date(d.updated).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
   return `
     <div class="bd-head">
-      <div><h2>AREA OWNERSHIP &amp; RESPONSIBILITY</h2><span class="bd-tag">OUR AREA · OUR RESPONSIBILITY · OUR PRIDE</span></div>
-      <div class="bd-badge">6S WORKPLACE<br>MANAGEMENT</div>
+      <div><h2>KEPEMILIKAN &amp; TANGGUNG JAWAB AREA</h2><span class="bd-tag">AREA KITA · TANGGUNG JAWAB KITA · KEBANGGAAN KITA</span></div>
+      <div class="bd-badge">MANAJEMEN<br>6S</div>
     </div>
     <div class="bd-zone">${esc(i.plantName)} · ${esc(i.areaName)} · ${esc(i.zoneName)}</div>
-    <div class="bd-groups">${cols}</div>
-    <div class="bd-low">
-      <div class="bd-day"><h3>NON SHIFT (DAY TEAM)</h3>
-        <div class="row">${day.length ? day.map(picCard).join('') : '<div class="bd-none" style="width:100%">Belum ada PIC</div>'}</div></div>
+    <div class="bd-groups" style="grid-template-columns:repeat(${groups.length},1fr)">${cols}</div>
+    <div class="bd-low">${dayBox}
       <div class="bd-info"><b>INFO ZONA</b>
-        Plant: ${esc(i.plantName)}<br>Area: ${esc(i.areaName)}<br>Zona: ${esc(i.zoneName)}<br>Update: ${upd}</div>
+        Plant: ${esc(i.plantName)}<br>Area: ${esc(i.areaName)}<br>Zona: ${esc(i.zoneName)}<br>Pembaruan: ${upd}</div>
     </div>
+    ${extraJd}
     <div class="bd-foot"><span><b>SEIRI</b> RINGKAS</span><span><b>SEITON</b> RAPI</span><span><b>SEISO</b> RESIK</span>
-      <span><b>SEIKETSU</b> RAWAT</span><span><b>SHITSUKE</b> RAJIN</span><span><b>SAFETY</b> SELAMAT</span></div>`;
+      <span><b>SEIKETSU</b> RAWAT</span><span><b>SHITSUKE</b> RAJIN</span><span><b>KESELAMATAN</b></span></div>`;
 }
 
 
@@ -294,7 +334,7 @@ function buildBoard(d) {
 function downloadBoard() {
 
   if (!CUR) {
-    alert('Silakan buka preview zona terlebih dahulu.');
+    alert('Silakan buka pratinjau zona terlebih dahulu.');
     return;
   }
 

@@ -1,0 +1,117 @@
+<section id="view-foto" class="view" style="display:none">
+  <div class="card wide">
+    <div class="header" style="margin-bottom:12px">
+      <h1>Data &amp; Foto PIC</h1>
+      <div class="sub">Kelola data PIC dan atur foto profil dengan crop kotak 1:1</div>
+    </div>
+
+    <div class="toolbar">
+      <select id="fotoPlant" onchange="fotoRenderList()">
+        <option value="">Semua Plant</option>
+      </select>
+      <input id="fotoSearch" type="text" placeholder="Cari nama / NIK / zona..." oninput="fotoRenderList()">
+      <button class="btn-sm" type="button" onclick="fotoLoadList(true)">🔄 Muat Ulang</button>
+    </div>
+
+    <div class="msg" id="fotoMsg"></div>
+    <div id="fotoCount" class="jd-count"></div>
+    <div id="picList" class="pic-grid">
+      <div class="empty">Memuat...</div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT DATA -->
+  <div id="picEditModal" class="modal" style="display:none">
+    <div class="modal-box jd-modal-box">
+      <div class="modal-bar">
+        <b>Edit Data PIC</b>
+        <button class="btn-sm ghost" type="button" onclick="fotoCloseEdit()">✖ Tutup</button>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label class="req">Plant / Line</label>
+          <select id="pePlant" onchange="fotoOnPlantChange()">
+            <option value="">-- Pilih Plant --</option>
+          </select>
+        </div>
+        <div>
+          <label class="req">Area</label>
+          <select id="peArea" onchange="fotoOnAreaChange()" disabled>
+            <option value="">-- Pilih Area --</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="req">Zona</label>
+      <select id="peZone" disabled>
+        <option value="">-- Pilih Zona --</option>
+      </select>
+
+      <div class="grid2">
+        <div>
+          <label class="req">Nama PIC</label>
+          <input id="peName" type="text" placeholder="Nama lengkap">
+        </div>
+        <div>
+          <label class="req">NIK</label>
+          <input id="peNik" type="text" maxlength="20" placeholder="Mis. 331032">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label class="req">Bagian / Departemen</label>
+          <input id="peDept" type="text" list="deptList" placeholder="Mis. Produksi, QC">
+        </div>
+        <div>
+          <label class="req">Grup / Shift</label>
+          <select id="peGrup">
+            <option value="">-- Pilih Grup --</option>
+            <option value="A">Grup A</option>
+            <option value="B">Grup B</option>
+            <option value="C">Grup C</option>
+            <option value="D">Grup D</option>
+            <option value="DT">Non Shift (Tim Harian)</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Keterangan</label>
+      <textarea id="peNotes" placeholder="Catatan tambahan (opsional)"></textarea>
+
+      <div class="jd-modal-actions">
+        <button class="btn-sm ghost" type="button" onclick="fotoCloseEdit()">Batal</button>
+        <button class="btn-sm" type="button" id="peBtnSave" onclick="fotoSaveEdit()">Simpan Perubahan</button>
+      </div>
+      <div class="msg" id="peMsg"></div>
+    </div>
+  </div>
+
+  <!-- MODAL CROP FOTO -->
+  <div id="cropModal" class="modal" style="display:none">
+    <div class="modal-box crop-box">
+      <div class="modal-bar">
+        <b>Atur Foto Profil (Kotak 1:1)</b>
+        <button class="btn-sm ghost" type="button" onclick="fotoCloseCrop()">✖ Tutup</button>
+      </div>
+
+      <div class="crop-stage">
+        <img id="cropImage" alt="Foto PIC">
+      </div>
+
+      <div class="crop-tools">
+        <label class="crop-zoom-label" for="cropZoom">🔍 Zoom</label>
+        <input type="range" id="cropZoom" min="0" max="100" value="0" oninput="fotoCropZoom(this.value)">
+        <button class="btn-sm ghost" type="button" onclick="fotoCropRotate()">↻ Rotate</button>
+        <button class="btn-sm ghost" type="button" onclick="fotoCropReset()">Reset</button>
+      </div>
+
+      <div class="jd-modal-actions">
+        <button class="btn-sm ghost" type="button" onclick="fotoCloseCrop()">Batal</button>
+        <button class="btn-sm" type="button" id="cropBtnSave" onclick="fotoSaveCrop()">Simpan Foto</button>
+      </div>
+      <div class="msg" id="cropMsg"></div>
+    </div>
+  </div>
+</section>

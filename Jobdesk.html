@@ -20,27 +20,6 @@
     <label class="req">Zona</label>
     <select id="jdZone" required disabled><option value="">-- Pilih Zona --</option></select>
 
-    <div class="grid2">
-      <div>
-        <label class="req">Nama PIC</label>
-        <input id="jdNamaPic" type="text" required placeholder="Nama lengkap">
-      </div>
-      <div>
-        <label class="req">NIK</label>
-        <input id="jdNik" type="text" required inputmode="text" maxlength="20" placeholder="Mis. 331032" pattern="[A-Za-z0-9]{4,20}" title="4-20 karakter huruf/angka tanpa spasi">
-      </div>
-    </div>
-
-    <label class="req">Grup / Shift</label>
-    <select id="jdGrup" required>
-      <option value="">-- Pilih Grup --</option>
-      <option value="A">Grup A</option>
-      <option value="B">Grup B</option>
-      <option value="C">Grup C</option>
-      <option value="D">Grup D</option>
-      <option value="DT">Non Shift (Day Team)</option>
-    </select>
-
     <div id="jdSections" class="jd-sections"></div>
 
     <button type="submit" id="jdBtnSave">Simpan Jobdesk</button>
@@ -53,8 +32,8 @@
       <div class="toolbar jd-toolbar">
         <select id="jdFilterPlant" onchange="jdRenderList()"><option value="">Semua Plant</option></select>
         <select id="jdFilterCat" onchange="jdRenderList()"><option value="">Semua Kategori</option></select>
-        <input id="jdSearch" type="text" placeholder="Cari jobdesk / area / zona / PIC..." oninput="jdRenderList()">
-        <button class="btn-sm" type="button" onclick="jdLoadList(true)">🔄 Refresh</button>
+        <input id="jdSearch" type="text" placeholder="Cari jobdesk / plant / area / zona..." oninput="jdRenderList()">
+        <button class="btn-sm" type="button" onclick="jdLoadList(true)">🔄 Muat Ulang</button>
       </div>
     </div>
     <div id="jdCount" class="jd-count"></div>
@@ -65,7 +44,7 @@
 <div id="jdModal" class="modal" style="display:none">
   <div class="modal-box jd-modal-box">
     <div class="modal-bar">
-      <b>Edit Jobdesk</b>
+      <b>Ubah Jobdesk</b>
       <button class="btn-sm ghost" type="button" onclick="jdCloseEdit()">✖ Tutup</button>
     </div>
     <label class="req">Kategori</label>

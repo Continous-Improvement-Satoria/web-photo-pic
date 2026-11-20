@@ -1,12 +1,12 @@
 /* ================================================================
    KONFIGURASI
    ================================================================ */
-const SPREADSHEET_ID  = '1azav1pZln8GUgVk964MyhR4H3yT-EIoBHMUQTvMJ5PQ';
+const SPREADSHEET_ID = '1azav1pZln8GUgVk964MyhR4H3yT-EIoBHMUQTvMJ5PQ';
 const DRIVE_FOLDER_ID = '1bOSDRFqokgiNnjjs-PcXQAOTrpALzMzO';
-const SHEET_AREA      = 'MASTER_AREA';
-const SHEET_ZONE      = 'MASTER_ZONE';
-const SHEET_SUB       = 'SUBMISSIONS';
-const MAX_FILE_BYTES  = 200 * 1024;
+const SHEET_AREA = 'MASTER_AREA';
+const SHEET_ZONE = 'MASTER_ZONE';
+const SHEET_SUB = 'SUBMISSIONS';
+const MAX_FILE_BYTES = 200 * 1024;
 const FALLBACK_FOLDER_NAME = 'Photo PIC Upload (Fallback)';
 
 /* ================================================================
@@ -103,14 +103,14 @@ function col_(m, names, def) {
 }
 // Susunan kolom tetap: A-Q (I=NIK, L=PHOTO_PIC_URL, Q=PHOTO_PIC_KB)
 const COLS_ = {
-  ts: [['TIMESTAMP'], 0], email: [['SUBMITTEREMAIL','EMAIL'], 1],
+  ts: [['TIMESTAMP'], 0], email: [['SUBMITTEREMAIL', 'EMAIL'], 1],
   plant: [['PLANT'], 2], areaId: [['AREAID'], 3],
   areaName: [['AREANAME'], 4], zoneId: [['ZONEID'], 5],
-  zoneName: [['ZONENAME'], 6], name: [['PICNAME','NAMAPIC'], 7],
-  nik: [['NIK'], 8], dept: [['DEPARTMENT','DEPARTEMEN'], 9],
-  grup: [['GROUP','GRUP','SHIFT'], 10],
-  url: [['PHOTOPICURL','PHOTOURL'], 11],
-  notes: [['NOTES','KETERANGAN'], 12],
+  zoneName: [['ZONENAME'], 6], name: [['PICNAME', 'NAMAPIC'], 7],
+  nik: [['NIK'], 8], dept: [['DEPARTMENT', 'DEPARTEMEN'], 9],
+  grup: [['GROUP', 'GRUP', 'SHIFT'], 10],
+  url: [['PHOTOPICURL', 'PHOTOURL'], 11],
+  notes: [['NOTES', 'KETERANGAN'], 12],
   lat: [['GPSLAT'], 13], lng: [['GPSLNG'], 14],
   ua: [['USERAGENT'], 15], kb: [['PHOTOPICKB'], 16]
 };
@@ -122,7 +122,7 @@ function idx_(m, key) { return col_(m, COLS_[key][0], COLS_[key][1]); }
    M NOTES, N GPS_LAT, O GPS_LNG, P USER_AGENT, Q PHOTO_PIC_KB
    ================================================================ */
 function submitForm(payload) {
-  const required = ['plantName','areaId','areaName','zoneId','zoneName','namaPic','nik','departemen','grup'];
+  const required = ['plantName', 'areaId', 'areaName', 'zoneId', 'zoneName', 'namaPic', 'nik', 'departemen', 'grup'];
   for (const k of required) {
     if (!payload[k] || String(payload[k]).trim() === '')
       throw new Error('Field wajib belum lengkap: ' + k);
@@ -204,7 +204,7 @@ function cleanNik_(value) {
 // Normalisasi grup: "Grup a", "GROUP B", "A" -> A/B/C/D; selain itu -> DT
 function normGrup_(g) {
   const s = String(g || '').toUpperCase().replace(/GRUP|GROUP|SHIFT/g, '').trim();
-  return ['A','B','C','D'].indexOf(s) >= 0 ? s : 'DT';
+  return ['A', 'B', 'C', 'D'].indexOf(s) >= 0 ? s : 'DT';
 }
 
 function getLatestPics_() {
@@ -232,8 +232,10 @@ function getLatestPics_() {
       url = String(r.filter(v => /drive\.google\.com/.test(String(v)))[0] || '');
     }
     if (!map[key] || ts >= map[key].ts) {
-      map[key] = { ts, zoneId, name, dept: String(r[I('dept')] || ''),
-                   grup: normGrup_(r[I('grup')]), url, nik };
+      map[key] = {
+        ts, zoneId, name, dept: String(r[I('dept')] || ''),
+        grup: normGrup_(r[I('grup')]), url, nik
+      };
     }
   });
   return Object.keys(map).map(k => map[k]);
@@ -250,9 +252,11 @@ function getZoneList() {
   });
   return m.zones.filter(z => areaById[z.areaId]).map(z => {
     const a = areaById[z.areaId], s = stat[z.id] || { count: 0, last: 0 };
-    return { zoneId: z.id, zoneName: z.name, areaId: a.id, areaName: a.name,
-             plantId: a.groupId, plantName: plantName[a.groupId] || a.groupId,
-             count: s.count, last: s.last };
+    return {
+      zoneId: z.id, zoneName: z.name, areaId: a.id, areaName: a.name,
+      plantId: a.groupId, plantName: plantName[a.groupId] || a.groupId,
+      count: s.count, last: s.last
+    };
   }).sort((x, y) => (x.plantId + x.areaId + x.zoneId).localeCompare(y.plantId + y.areaId + y.zoneId));
 }
 
@@ -262,9 +266,13 @@ function getZoneBoard(zoneId) {
   if (!info) throw new Error('Zona tidak ditemukan.');
   const pics = getLatestPics_().filter(p => p.zoneId === zoneId)
     .sort((a, b) => a.ts - b.ts)
-    .map(p => { const f = photoDataUrl_(p.url);
-      return { name: p.name, nik: p.nik, dept: p.dept, grup: p.grup, photo: f.data, err: f.err }; });
-  return { info, pics, updated: info.last };
+    .map(p => {
+      const f = photoDataUrl_(p.url);
+      return { name: p.name, nik: p.nik, dept: p.dept, grup: p.grup, photo: f.data, err: f.err };
+    });
+  const jobdesks = typeof getZoneJobdesks_ === 'function' ? getZoneJobdesks_(zoneId) : [];
+  const jobUpdated = jobdesks.reduce((max, j) => Math.max(max, j.updatedAt || 0), 0);
+  return { info, pics, jobdesks, updated: Math.max(info.last || 0, jobUpdated) };
 }
 
 function photoDataUrl_(url) {
@@ -274,6 +282,184 @@ function photoDataUrl_(url) {
     const blob = DriveApp.getFileById(m[1]).getBlob();
     return { data: 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes()), err: '' };
   } catch (e) { return { data: '', err: String(e.message || e) }; }
+}
+
+/* ================================================================
+   MENU FOTO: DAFTAR ORANG, EDIT DATA & GANTI FOTO
+   ================================================================ */
+function driveFileId_(url) {
+  const s = String(url || '');
+  const m = s.match(/\/d\/([-\w]+)/) || s.match(/[?&]id=([-\w]+)/);
+  return m ? m[1] : '';
+}
+
+function driveThumb_(url, size) {
+  const id = driveFileId_(url);
+  return id ? 'https://drive.google.com/thumbnail?id=' + id + '&sz=w' + (size || 400) : '';
+}
+
+function picSheet_() {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_SUB);
+  if (!sheet) throw new Error('Sheet SUBMISSIONS tidak ditemukan.');
+  ensureHeaders_(sheet);
+  return sheet;
+}
+
+function picRowUrl_(sheet, row) {
+  const headers = sheet.getRange(1, 1, 1, PIC_HEADERS_.length).getDisplayValues()[0];
+  const hm = hmap_(headers);
+  return String(sheet.getRange(row, idx_(hm, 'url') + 1).getValue() || '');
+}
+
+// Satu kartu per orang (submit terbaru), lengkap dengan nomor baris untuk edit.
+function getPicList() {
+  const sheet = picSheet_();
+  if (sheet.getLastRow() < 2) return [];
+  const range = sheet.getRange(1, 1, sheet.getLastRow(), PIC_HEADERS_.length);
+  const all = range.getValues();
+  const nikText = range.getDisplayValues();
+  const m = hmap_(all.shift());
+  nikText.shift();
+  const I = k => idx_(m, k);
+  const map = {};
+
+  all.forEach((r, i) => {
+    const zoneId = String(r[I('zoneId')] || '').trim();
+    if (!zoneId) return;
+    const nik = String(nikText[i][I('nik')] || '').trim();
+    const name = String(r[I('name')] || '').trim();
+    const key = zoneId + '|' + (nik || name.toLowerCase());
+    const t = r[I('ts')];
+    const ts = t instanceof Date ? t.getTime() : 0;
+    let url = String(r[I('url')] || '');
+    if (!/^https?:\/\//.test(url)) {
+      url = String(r.filter(v => /drive\.google\.com/.test(String(v)))[0] || '');
+    }
+    if (!map[key] || ts >= map[key].ts) {
+      map[key] = {
+        row: i + 2, ts: ts,
+        plant: String(r[I('plant')] || ''),
+        areaId: String(r[I('areaId')] || ''),
+        areaName: String(r[I('areaName')] || ''),
+        zoneId: zoneId,
+        zoneName: String(r[I('zoneName')] || ''),
+        name: name, nik: nik,
+        dept: String(r[I('dept')] || ''),
+        grup: normGrup_(r[I('grup')]),
+        notes: String(r[I('notes')] || ''),
+        url: url, thumb: driveThumb_(url, 400),
+        kb: r[I('kb')]
+      };
+    }
+  });
+
+  return Object.keys(map).map(k => map[k])
+    .sort((a, b) => (a.plant + a.areaId + a.zoneId + a.name)
+      .localeCompare(b.plant + b.areaId + b.zoneId + b.name));
+}
+
+function updatePicData(payload) {
+  const sheet = picSheet_();
+  const row = parseInt(payload && payload.row, 10);
+  if (!row || row < 2 || row > sheet.getLastRow()) throw new Error('Baris data tidak valid.');
+
+  const plantName = String(payload.plantName || '').trim();
+  const areaId = String(payload.areaId || '').trim();
+  const areaName = String(payload.areaName || '').trim();
+  const zoneId = String(payload.zoneId || '').trim();
+  const zoneName = String(payload.zoneName || '').trim();
+  const name = String(payload.name || '').trim();
+  const nik = String(payload.nik || '').trim();
+  const dept = String(payload.dept || '').trim();
+  const grup = String(payload.grup || '').trim();
+  const notes = String(payload.notes || '').trim();
+
+  if (!plantName || !areaId || !areaName || !zoneId || !zoneName) {
+    throw new Error('Plant, Area, dan Zona wajib dipilih.');
+  }
+  if (!name) throw new Error('Nama PIC wajib diisi.');
+  if (!/^[A-Za-z0-9]{4,20}$/.test(nik)) throw new Error('NIK harus 4-20 karakter huruf/angka tanpa spasi.');
+  if (!dept) throw new Error('Departemen wajib diisi.');
+  if (!grup) throw new Error('Grup wajib dipilih.');
+
+  const md = getMasterData();
+  const zone = md.zones.filter(z => z.id === zoneId)[0];
+  if (!zone) throw new Error('Zona tidak ditemukan di master.');
+  if (zone.areaId !== areaId) throw new Error('Zona tidak sesuai dengan Area.');
+  const area = md.areas.filter(a => a.id === areaId)[0];
+  if (!area) throw new Error('Area tidak ditemukan di master.');
+  const plant = md.plants.filter(p => p.id === area.groupId)[0];
+  if (plant && plant.name !== plantName) throw new Error('Area tidak sesuai dengan Plant.');
+
+  const headers = sheet.getRange(1, 1, 1, PIC_HEADERS_.length).getDisplayValues()[0];
+  const hm = hmap_(headers);
+  const set = (key, val) => sheet.getRange(row, idx_(hm, key) + 1).setValue(val);
+
+  set('plant', plantName);
+  set('areaId', areaId);
+  set('areaName', areaName);
+  set('zoneId', zoneId);
+  set('zoneName', zoneName);
+  set('name', name);
+  sheet.getRange(row, idx_(hm, 'nik') + 1).setNumberFormat('@').setValue(nik);
+  set('dept', dept);
+  set('grup', normGrup_(grup));
+  set('notes', notes);
+  SpreadsheetApp.flush();
+
+  return { success: true, message: 'Data PIC berhasil diperbarui.' };
+}
+
+function getPicPhoto(row) {
+  const sheet = picSheet_();
+  const r = parseInt(row, 10);
+  if (!r || r < 2 || r > sheet.getLastRow()) throw new Error('Baris data tidak valid.');
+  const url = picRowUrl_(sheet, r);
+  if (!/^https?:\/\//.test(url)) throw new Error('Foto PIC tidak ditemukan.');
+  const f = photoDataUrl_(url);
+  if (!f.data) throw new Error(f.err || 'Foto tidak dapat dimuat.');
+  return { data: f.data };
+}
+
+function updatePicPhoto(payload) {
+  const sheet = picSheet_();
+  const row = parseInt(payload && payload.row, 10);
+  if (!row || row < 2 || row > sheet.getLastRow()) throw new Error('Baris data tidak valid.');
+
+  const headers = sheet.getRange(1, 1, 1, PIC_HEADERS_.length).getDisplayValues()[0];
+  const hm = hmap_(headers);
+  const vals = sheet.getRange(row, 1, 1, PIC_HEADERS_.length).getValues()[0];
+  const get = key => vals[idx_(hm, key)];
+  const plantName = String(get('plant') || '').trim();
+  const areaId = String(get('areaId') || '').trim();
+  const areaName = String(get('areaName') || '').trim();
+  const zoneId = String(get('zoneId') || '').trim();
+  const zoneName = String(get('zoneName') || '').trim();
+  const name = String(get('name') || '').trim();
+  const oldUrl = String(get('url') || '').trim();
+
+  const upload = uploadToDrive(
+    payload.fotoPic, name, 'PIC',
+    plantName || 'UNKNOWN', `${areaId} — ${areaName}`, `${zoneId} — ${zoneName}`
+  );
+
+  sheet.getRange(row, idx_(hm, 'url') + 1).setValue(upload.url);
+  sheet.getRange(row, idx_(hm, 'kb') + 1).setValue(upload.sizeKB);
+  SpreadsheetApp.flush();
+
+  const oldId = driveFileId_(oldUrl);
+  if (oldId && oldId !== driveFileId_(upload.url)) {
+    try { DriveApp.getFileById(oldId).setTrashed(true); }
+    catch (e) { console.warn('Foto lama tidak dapat dihapus: ' + (e && e.message ? e.message : e)); }
+  }
+
+  const note = upload.fallback ? ' Foto disimpan di folder fallback.' : '';
+  return {
+    success: true,
+    message: 'Foto PIC berhasil diperbarui.' + note,
+    url: upload.url,
+    thumb: driveThumb_(upload.url, 400)
+  };
 }
 
 // Jalankan manual dari editor untuk cek data: debugZone('1BS5')
@@ -291,17 +477,17 @@ function debugZone(zoneId) {
 function uploadToDrive(fileData, picName, prefix, plantName, areaLabel, zoneLabel) {
   if (!fileData || !fileData.data) throw new Error('Foto ' + prefix + ' kosong.');
   const base64 = fileData.data.split(',')[1] || fileData.data;
-  const bytes  = Utilities.base64Decode(base64);
+  const bytes = Utilities.base64Decode(base64);
   const sizeKB = Math.round(bytes.length / 1024);
   if (bytes.length > MAX_FILE_BYTES) throw new Error(`Foto ${prefix} ${sizeKB} KB melebihi batas 200 KB.`);
 
-  const uploadRoot  = getUploadRoot_();
-  const root        = uploadRoot.folder;
+  const uploadRoot = getUploadRoot_();
+  const root = uploadRoot.folder;
   const plantFolder = getOrCreateFolder(root, sanitizeFolderName(plantName));
-  const areaFolder  = getOrCreateFolder(plantFolder, sanitizeFolderName(areaLabel));
-  const zoneFolder  = getOrCreateFolder(areaFolder,  sanitizeFolderName(zoneLabel));
+  const areaFolder = getOrCreateFolder(plantFolder, sanitizeFolderName(areaLabel));
+  const zoneFolder = getOrCreateFolder(areaFolder, sanitizeFolderName(zoneLabel));
 
-  const ts   = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss');
+  const ts = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss');
   const safe = sanitizeFolderName(picName || 'unknown');
   const filename = `${ts}_${prefix}_${safe}.jpg`;
 

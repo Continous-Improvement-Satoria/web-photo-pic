@@ -22,10 +22,8 @@ function getJobdeskList() {
   validateJobdeskHeaders_(sheet);
   const range = sheet.getRange(1, 1, sheet.getLastRow(), JD_HEADERS_.length);
   const rows = range.getValues();
-  const display = range.getDisplayValues();
   rows.shift();
-  display.shift();
-  return rows.map((r, i) => ({
+  return rows.map(r => ({
     id: String(r[0] || ''),
     timestamp: jdTime_(r[1]),
     updatedAt: jdTime_(r[2]),
@@ -34,12 +32,34 @@ function getJobdeskList() {
     areaName: String(r[5] || ''),
     zoneId: String(r[6] || ''),
     zoneName: String(r[7] || ''),
-    picName: String(r[8] || ''),
-    nik: String(display[i][9] || ''),
-    group: String(r[10] || ''),
     category: String(r[11] || ''),
     description: String(r[12] || '')
   })).filter(x => x.id);
+}
+
+function getZoneJobdesks_(zoneId) {
+  const key = String(zoneId || '').trim();
+  if (!key) return [];
+  try {
+    return getJobdeskList()
+      .filter(it => it.zoneId === key)
+      .sort((a, b) => {
+        const ca = JD_CATEGORIES_.indexOf(a.category);
+        const cb = JD_CATEGORIES_.indexOf(b.category);
+        const oa = ca < 0 ? 99 : ca;
+        const ob = cb < 0 ? 99 : cb;
+        if (oa !== ob) return oa - ob;
+        return (a.updatedAt || 0) - (b.updatedAt || 0);
+      })
+      .map(it => ({
+        category: it.category,
+        description: it.description,
+        updatedAt: it.updatedAt
+      }));
+  } catch (e) {
+    console.warn('Jobdesk zona ' + key + ' tidak dapat dimuat: ' + (e && e.message ? e.message : e));
+    return [];
+  }
 }
 
 function saveJobdeskBatch(payload) {
@@ -49,7 +69,7 @@ function saveJobdeskBatch(payload) {
   const now = new Date();
   const rows = items.map(it => [
     Utilities.getUuid(), now, now, head.plantName, head.areaId, head.areaName,
-    head.zoneId, head.zoneName, head.namaPic, head.nik, head.grup,
+    head.zoneId, head.zoneName, '', '', '',
     it.category, it.description
   ]);
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, JD_HEADERS_.length).setValues(rows);
@@ -59,17 +79,12 @@ function saveJobdeskBatch(payload) {
 function updateJobdeskItem(payload) {
   const id = String(payload.id || '').trim();
   if (!id) throw new Error('ID jobdesk tidak valid.');
-  const head = validateJobdeskHead_(payload);
   const items = validateJobdeskItems_([{ category: payload.category, description: payload.description }]);
   const item = items[0];
   const sheet = ensureJobdeskSheet_();
   const row = findJobdeskRow_(sheet, id);
-  const created = sheet.getRange(row, 2).getValue();
-  sheet.getRange(row, 1, 1, JD_HEADERS_.length).setValues([[
-    id, created, new Date(), head.plantName, head.areaId, head.areaName,
-    head.zoneId, head.zoneName, head.namaPic, head.nik, head.grup,
-    item.category, item.description
-  ]]);
+  sheet.getRange(row, 3).setValue(new Date());
+  sheet.getRange(row, 12, 1, 2).setValues([[item.category, item.description]]);
   return { success: true, message: 'Jobdesk berhasil diperbarui.' };
 }
 
@@ -80,6 +95,18 @@ function deleteJobdeskItem(id) {
   const row = findJobdeskRow_(sheet, key);
   sheet.deleteRow(row);
   return { success: true, message: 'Jobdesk berhasil dihapus.' };
+}
+
+function bersihkanKolomPicJobdesk() {
+  const sheet = ensureJobdeskSheet_();
+  const last = sheet.getLastRow();
+  if (last < 2) {
+    Logger.log('Tidak ada data jobdesk untuk dibersihkan.');
+    return;
+  }
+  sheet.getRange(2, 9, last - 1, 3).clearContent();
+  SpreadsheetApp.flush();
+  Logger.log('Kolom PIC_NAME, NIK, dan GROUP pada JOBDESK berhasil dikosongkan.');
 }
 
 function setupJobdeskHeaders() {
@@ -159,21 +186,16 @@ function validateJobdeskHeaders_(sheet) {
 }
 
 function validateJobdeskHead_(payload) {
-  const required = ['plantName', 'areaId', 'areaName', 'zoneId', 'zoneName', 'namaPic', 'nik', 'grup'];
+  const required = ['plantName', 'areaId', 'areaName', 'zoneId', 'zoneName'];
   required.forEach(k => {
     if (!payload[k] || String(payload[k]).trim() === '') throw new Error('Field wajib belum lengkap: ' + k);
   });
-  const nik = String(payload.nik).trim();
-  if (!/^[A-Za-z0-9]{4,20}$/.test(nik)) throw new Error('NIK harus 4-20 karakter huruf/angka tanpa spasi.');
   return {
     plantName: String(payload.plantName).trim(),
     areaId: String(payload.areaId).trim(),
     areaName: String(payload.areaName).trim(),
     zoneId: String(payload.zoneId).trim(),
-    zoneName: String(payload.zoneName).trim(),
-    namaPic: String(payload.namaPic).trim(),
-    nik: nik,
-    grup: String(payload.grup).trim().toUpperCase()
+    zoneName: String(payload.zoneName).trim()
   };
 }
 

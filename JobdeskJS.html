@@ -5,14 +5,18 @@ let JD_LOADED = false;
 let JD_EDIT = null;
 
 const JD_CATS = [
-  { k: 'RINGKAS', en: 'Seiri' },
-  { k: 'RAPI', en: 'Seiton' },
-  { k: 'RESIK', en: 'Seiso' },
-  { k: 'RAWAT', en: 'Seiketsu' },
-  { k: 'RAJIN', en: 'Shitsuke' },
-  { k: 'SAFETY', en: 'Safety' }
+  { k: 'RINGKAS', en: 'Seiri', label: 'RINGKAS' },
+  { k: 'RAPI', en: 'Seiton', label: 'RAPI' },
+  { k: 'RESIK', en: 'Seiso', label: 'RESIK' },
+  { k: 'RAWAT', en: 'Seiketsu', label: 'RAWAT' },
+  { k: 'RAJIN', en: 'Shitsuke', label: 'RAJIN' },
+  { k: 'SAFETY', en: 'Keselamatan Kerja', label: 'KESELAMATAN' }
 ];
-const JD_GROUPS = { A: 'Grup A', B: 'Grup B', C: 'Grup C', D: 'Grup D', DT: 'Day Team' };
+function jdCatLabel(k) {
+  const key = String(k || '').toUpperCase();
+  const c = JD_CATS.find(x => x.k === key);
+  return c ? c.label : key;
+}
 
 function initJobdesk() {
   jdBuildStatic();
@@ -44,7 +48,7 @@ function jdBuildStatic() {
   $('jdSections').innerHTML = JD_CATS.map(c => `
     <div class="jd-section" data-cat="${c.k}">
       <div class="jd-section-head">
-        <span class="cat-badge cat-${c.k.toLowerCase()}">${c.k}</span>
+        <span class="cat-badge cat-${c.k.toLowerCase()}">${c.label}</span>
         <span class="jd-cat-sub">${c.en}</span>
       </div>
       <div class="jd-rows"></div>
@@ -52,8 +56,8 @@ function jdBuildStatic() {
     </div>`).join('');
   JD_CATS.forEach(c => jdAddRow(c.k));
   $('jdFilterCat').innerHTML = '<option value="">Semua Kategori</option>' +
-    JD_CATS.map(c => `<option value="${c.k}">${c.k}</option>`).join('');
-  $('jdEditCat').innerHTML = JD_CATS.map(c => `<option value="${c.k}">${c.k}</option>`).join('');
+    JD_CATS.map(c => `<option value="${c.k}">${c.label}</option>`).join('');
+  $('jdEditCat').innerHTML = JD_CATS.map(c => `<option value="${c.k}">${c.label}</option>`).join('');
 }
 
 function jdAddRow(cat, value) {
@@ -146,19 +150,6 @@ function jdSubmit(ev) {
     jdShow('Lengkapi Plant, Area, dan Zona terlebih dahulu.', false);
     return false;
   }
-  const nik = $('jdNik').value.trim();
-  if (!/^[A-Za-z0-9]{4,20}$/.test(nik)) {
-    jdShow('NIK harus 4-20 karakter huruf/angka tanpa spasi.', false);
-    return false;
-  }
-  if (!$('jdNamaPic').value.trim()) {
-    jdShow('Nama PIC wajib diisi.', false);
-    return false;
-  }
-  if (!$('jdGrup').value) {
-    jdShow('Pilih Grup / Shift.', false);
-    return false;
-  }
   const items = jdCollectItems();
   if (!items.length) {
     jdShow('Isi minimal satu jobdesk.', false);
@@ -178,9 +169,6 @@ function jdSubmit(ev) {
     areaName: area ? area.name : $('jdArea').selectedOptions[0].textContent,
     zoneId: zoneId,
     zoneName: zone ? zone.name : $('jdZone').selectedOptions[0].textContent,
-    namaPic: $('jdNamaPic').value.trim(),
-    nik: nik,
-    grup: $('jdGrup').value,
     items: items
   };
 
@@ -233,7 +221,7 @@ function jdRenderList() {
   const q = $('jdSearch').value.toLowerCase().trim();
   const list = JD_ITEMS
     .filter(it => (!fp || it.plant === fp) && (!fc || it.category === fc))
-    .filter(it => !q || [it.description, it.plant, it.areaId, it.areaName, it.zoneId, it.zoneName, it.picName, it.nik, it.group]
+    .filter(it => !q || [it.description, it.plant, it.areaId, it.areaName, it.zoneId, it.zoneName]
       .join(' ').toLowerCase().includes(q))
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
@@ -243,7 +231,7 @@ function jdRenderList() {
     return;
   }
   $('jdList').innerHTML = `<div class="jd-table-wrap"><table class="jd-table">
-    <thead><tr><th>Kategori</th><th>Jobdesk</th><th>Plant</th><th>Area</th><th>Zona</th><th>PIC</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>Kategori</th><th>Jobdesk</th><th>Plant</th><th>Area</th><th>Zona</th><th>Aksi</th></tr></thead>
     <tbody>${list.map(jdRowHtml).join('')}</tbody></table></div>`;
 }
 
@@ -253,14 +241,13 @@ function jdRowHtml(it) {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   }) : '-';
   return `<tr>
-    <td><span class="cat-badge cat-${esc(cat.toLowerCase())}">${esc(cat)}</span><div class="jd-sub">${esc(upd)}</div></td>
+    <td><span class="cat-badge cat-${esc(cat.toLowerCase())}">${esc(jdCatLabel(cat))}</span><div class="jd-sub">${esc(upd)}</div></td>
     <td class="jd-desc">${esc(it.description)}</td>
     <td>${esc(it.plant)}</td>
     <td>${esc(it.areaId)} — ${esc(it.areaName)}</td>
     <td>${esc(it.zoneId)} — ${esc(it.zoneName)}</td>
-    <td><b>${esc(it.picName)}</b><div class="jd-sub">NIK ${esc(it.nik)} · ${esc(JD_GROUPS[it.group] || it.group)}</div></td>
     <td><div class="jd-actions">
-      <button class="btn-sm ghost" type="button" onclick="jdOpenEdit('${esc(it.id)}')">Edit</button>
+      <button class="btn-sm ghost" type="button" onclick="jdOpenEdit('${esc(it.id)}')">Ubah</button>
       <button class="btn-sm danger" type="button" onclick="jdDelete('${esc(it.id)}')">Hapus</button>
     </div></td>
   </tr>`;
@@ -313,14 +300,6 @@ function jdSaveEdit() {
     })
     .updateJobdeskItem({
       id: it.id,
-      plantName: it.plant,
-      areaId: it.areaId,
-      areaName: it.areaName,
-      zoneId: it.zoneId,
-      zoneName: it.zoneName,
-      namaPic: it.picName,
-      nik: it.nik,
-      grup: it.group,
       category: category,
       description: description
     });
