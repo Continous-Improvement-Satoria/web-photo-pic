@@ -44,43 +44,55 @@ function jdEnsureMaster(cb) {
 }
 
 function jdBuildStatic() {
-  if ($('jdSections').childElementCount) return;
-  $('jdSections').innerHTML = JD_CATS.map(c => `
-    <div class="jd-section" data-cat="${c.k}">
-      <div class="jd-section-head">
-        <span class="cat-badge cat-${c.k.toLowerCase()}">${c.label}</span>
-        <span class="jd-cat-sub">${c.en}</span>
-      </div>
-      <div class="jd-rows"></div>
-      <button class="btn-sm ghost" type="button" onclick="jdAddRow('${c.k}')">+ Tambah Jobdesk</button>
-    </div>`).join('');
-  JD_CATS.forEach(c => jdAddRow(c.k));
+  if ($('jdRows').childElementCount) return;
   $('jdFilterCat').innerHTML = '<option value="">Semua Kategori</option>' +
     JD_CATS.map(c => `<option value="${c.k}">${c.label}</option>`).join('');
   $('jdEditCat').innerHTML = JD_CATS.map(c => `<option value="${c.k}">${c.label}</option>`).join('');
+  jdAddRow();
 }
 
-function jdAddRow(cat, value) {
-  const wrap = document.querySelector(`#jdSections .jd-section[data-cat="${cat}"] .jd-rows`);
+function jdAddRow(category, kegiatan, kriteria) {
+  const wrap = $('jdRows');
   if (!wrap) return;
   const row = document.createElement('div');
-  row.className = 'jd-row';
-  const ta = document.createElement('textarea');
-  ta.maxLength = 1000;
-  ta.rows = 2;
-  ta.placeholder = 'Tulis jobdesk...';
-  ta.value = value || '';
-  ta.oninput = () => jdAutoGrow(ta);
+  row.className = 'jd-input-row';
+
+  const sel = document.createElement('select');
+  sel.className = 'jd-row-cat';
+  JD_CATS.forEach(c => sel.add(new Option(c.label, c.k)));
+  const key = String(category || '').toUpperCase();
+  sel.value = JD_CATS.some(c => c.k === key) ? key : JD_CATS[0].k;
+
+  const taKeg = document.createElement('textarea');
+  taKeg.className = 'jd-row-kegiatan';
+  taKeg.maxLength = 1000;
+  taKeg.rows = 2;
+  taKeg.placeholder = 'Tulis kegiatan...';
+  taKeg.value = kegiatan || '';
+  taKeg.oninput = () => jdAutoGrow(taKeg);
+
+  const taKri = document.createElement('textarea');
+  taKri.className = 'jd-row-kriteria';
+  taKri.maxLength = 1000;
+  taKri.rows = 2;
+  taKri.placeholder = 'Tulis kriteria...';
+  taKri.value = kriteria || '';
+  taKri.oninput = () => jdAutoGrow(taKri);
+
   const del = document.createElement('button');
   del.type = 'button';
   del.className = 'jd-del';
   del.title = 'Hapus baris';
   del.textContent = '✕';
   del.onclick = () => row.remove();
-  row.appendChild(ta);
+
+  row.appendChild(sel);
+  row.appendChild(taKeg);
+  row.appendChild(taKri);
   row.appendChild(del);
   wrap.appendChild(row);
-  jdAutoGrow(ta);
+  jdAutoGrow(taKeg);
+  jdAutoGrow(taKri);
 }
 
 function jdAutoGrow(el) {
@@ -89,8 +101,9 @@ function jdAutoGrow(el) {
 }
 
 function jdResetRows() {
-  document.querySelectorAll('#jdSections .jd-rows').forEach(w => { w.innerHTML = ''; });
-  JD_CATS.forEach(c => jdAddRow(c.k));
+  const wrap = $('jdRows');
+  if (wrap) wrap.innerHTML = '';
+  jdAddRow();
 }
 
 function jdFillPlant() {
@@ -131,12 +144,11 @@ function jdOnAreaChange() {
 
 function jdCollectItems() {
   const items = [];
-  document.querySelectorAll('#jdSections .jd-section').forEach(sec => {
-    const category = sec.dataset.cat;
-    sec.querySelectorAll('.jd-row textarea').forEach(t => {
-      const description = String(t.value || '').trim();
-      if (description) items.push({ category: category, description: description });
-    });
+  document.querySelectorAll('#jdRows .jd-input-row').forEach(row => {
+    const category = row.querySelector('.jd-row-cat').value;
+    const kegiatan = String(row.querySelector('.jd-row-kegiatan').value || '').trim();
+    const kriteria = String(row.querySelector('.jd-row-kriteria').value || '').trim();
+    if (kegiatan || kriteria) items.push({ category: category, kegiatan: kegiatan, kriteria: kriteria });
   });
   return items;
 }
@@ -155,8 +167,12 @@ function jdSubmit(ev) {
     jdShow('Isi minimal satu jobdesk.', false);
     return false;
   }
-  if (items.some(it => it.description.length > 1000)) {
-    jdShow('Setiap jobdesk maksimal 1000 karakter.', false);
+  if (items.some(it => !it.kegiatan || !it.kriteria)) {
+    jdShow('Kegiatan dan Kriteria wajib diisi.', false);
+    return false;
+  }
+  if (items.some(it => it.kegiatan.length > 1000 || it.kriteria.length > 1000)) {
+    jdShow('Kegiatan dan Kriteria maksimal 1000 karakter.', false);
     return false;
   }
 
@@ -221,7 +237,7 @@ function jdRenderList() {
   const q = $('jdSearch').value.toLowerCase().trim();
   const list = JD_ITEMS
     .filter(it => (!fp || it.plant === fp) && (!fc || it.category === fc))
-    .filter(it => !q || [it.description, it.plant, it.areaId, it.areaName, it.zoneId, it.zoneName]
+    .filter(it => !q || [it.kegiatan, it.kriteria, it.plant, it.areaId, it.areaName, it.zoneId, it.zoneName]
       .join(' ').toLowerCase().includes(q))
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
@@ -231,7 +247,7 @@ function jdRenderList() {
     return;
   }
   $('jdList').innerHTML = `<div class="jd-table-wrap"><table class="jd-table">
-    <thead><tr><th>Kategori</th><th>Jobdesk</th><th>Plant</th><th>Area</th><th>Zona</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>Kategori</th><th>Kegiatan</th><th>Kriteria</th><th>Plant</th><th>Area</th><th>Zona</th><th>Aksi</th></tr></thead>
     <tbody>${list.map(jdRowHtml).join('')}</tbody></table></div>`;
 }
 
@@ -242,7 +258,8 @@ function jdRowHtml(it) {
   }) : '-';
   return `<tr>
     <td><span class="cat-badge cat-${esc(cat.toLowerCase())}">${esc(jdCatLabel(cat))}</span><div class="jd-sub">${esc(upd)}</div></td>
-    <td class="jd-desc">${esc(it.description)}</td>
+    <td class="jd-desc">${esc(it.kegiatan)}</td>
+    <td class="jd-desc">${esc(it.kriteria)}</td>
     <td>${esc(it.plant)}</td>
     <td>${esc(it.areaId)} — ${esc(it.areaName)}</td>
     <td>${esc(it.zoneId)} — ${esc(it.zoneName)}</td>
@@ -258,7 +275,8 @@ function jdOpenEdit(id) {
   if (!it) return;
   JD_EDIT = it;
   $('jdEditCat').value = it.category;
-  $('jdEditDesc').value = it.description;
+  $('jdEditKegiatan').value = it.kegiatan || '';
+  $('jdEditKriteria').value = it.kriteria || '';
   $('jdEditMsg').className = 'msg';
   $('jdEditMsg').textContent = '';
   $('jdBtnEditSave').disabled = false;
@@ -281,9 +299,14 @@ function jdEditShow(text, ok) {
 function jdSaveEdit() {
   if (!JD_EDIT) return;
   const category = $('jdEditCat').value;
-  const description = $('jdEditDesc').value.trim();
-  if (!description) { jdEditShow('Jobdesk wajib diisi.', false); return; }
-  if (description.length > 1000) { jdEditShow('Jobdesk maksimal 1000 karakter.', false); return; }
+  const kegiatan = $('jdEditKegiatan').value.trim();
+  const kriteria = $('jdEditKriteria').value.trim();
+  if (!kegiatan) { jdEditShow('Kegiatan wajib diisi.', false); return; }
+  if (!kriteria) { jdEditShow('Kriteria wajib diisi.', false); return; }
+  if (kegiatan.length > 1000 || kriteria.length > 1000) {
+    jdEditShow('Kegiatan dan Kriteria maksimal 1000 karakter.', false);
+    return;
+  }
 
   const it = JD_EDIT;
   const btn = $('jdBtnEditSave');
@@ -301,7 +324,8 @@ function jdSaveEdit() {
     .updateJobdeskItem({
       id: it.id,
       category: category,
-      description: description
+      kegiatan: kegiatan,
+      kriteria: kriteria
     });
 }
 

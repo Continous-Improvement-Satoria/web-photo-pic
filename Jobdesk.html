@@ -2,7 +2,7 @@
 <div class="card wide">
   <div class="header" style="margin-bottom:12px">
     <h1>Jobdesk 6S</h1>
-    <div class="sub">Rincian pekerjaan 6S per Plant, Area, dan Zona</div>
+    <div class="sub">Rincian kegiatan &amp; kriteria 6S per Plant, Area, dan Zona</div>
   </div>
 
   <form id="jdForm" onsubmit="return jdSubmit(event)">
@@ -20,7 +20,11 @@
     <label class="req">Zona</label>
     <select id="jdZone" required disabled><option value="">-- Pilih Zona --</option></select>
 
-    <div id="jdSections" class="jd-sections"></div>
+    <div class="jd-input-head">
+      <span>Kategori</span><span>Kegiatan</span><span>Kriteria</span><span></span>
+    </div>
+    <div id="jdRows" class="jd-rows-wrap"></div>
+    <button type="button" class="btn-sm ghost" onclick="jdAddRow()">+ Tambah Baris</button>
 
     <button type="submit" id="jdBtnSave">Simpan Jobdesk</button>
     <div class="msg" id="jdMsg"></div>
@@ -32,7 +36,7 @@
       <div class="toolbar jd-toolbar">
         <select id="jdFilterPlant" onchange="jdRenderList()"><option value="">Semua Plant</option></select>
         <select id="jdFilterCat" onchange="jdRenderList()"><option value="">Semua Kategori</option></select>
-        <input id="jdSearch" type="text" placeholder="Cari jobdesk / plant / area / zona..." oninput="jdRenderList()">
+        <input id="jdSearch" type="text" placeholder="Cari kegiatan / kriteria / plant / area / zona..." oninput="jdRenderList()">
         <button class="btn-sm" type="button" onclick="jdLoadList(true)">🔄 Muat Ulang</button>
       </div>
     </div>
@@ -49,8 +53,10 @@
     </div>
     <label class="req">Kategori</label>
     <select id="jdEditCat"></select>
-    <label class="req">Jobdesk</label>
-    <textarea id="jdEditDesc" maxlength="1000" placeholder="Tulis jobdesk..."></textarea>
+    <label class="req">Kegiatan</label>
+    <textarea id="jdEditKegiatan" maxlength="1000" placeholder="Tulis kegiatan..."></textarea>
+    <label class="req">Kriteria</label>
+    <textarea id="jdEditKriteria" maxlength="1000" placeholder="Tulis kriteria..."></textarea>
     <div class="jd-modal-actions">
       <button class="btn-sm ghost" type="button" onclick="jdCloseEdit()">Batal</button>
       <button class="btn-sm" type="button" id="jdBtnEditSave" onclick="jdSaveEdit()">Simpan Perubahan</button>

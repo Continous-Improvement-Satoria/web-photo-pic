@@ -12,7 +12,8 @@ const JD_HEADERS_ = [
   'NIK',
   'GROUP',
   'CATEGORY',
-  'DESCRIPTION'
+  'KEGIATAN',
+  'KRITERIA'
 ];
 const JD_CATEGORIES_ = ['RINGKAS', 'RAPI', 'RESIK', 'RAWAT', 'RAJIN', 'SAFETY'];
 
@@ -33,7 +34,8 @@ function getJobdeskList() {
     zoneId: String(r[6] || ''),
     zoneName: String(r[7] || ''),
     category: String(r[11] || ''),
-    description: String(r[12] || '')
+    kegiatan: String(r[12] || ''),
+    kriteria: String(r[13] || '')
   })).filter(x => x.id);
 }
 
@@ -53,7 +55,8 @@ function getZoneJobdesks_(zoneId) {
       })
       .map(it => ({
         category: it.category,
-        description: it.description,
+        kegiatan: it.kegiatan,
+        kriteria: it.kriteria,
         updatedAt: it.updatedAt
       }));
   } catch (e) {
@@ -70,7 +73,7 @@ function saveJobdeskBatch(payload) {
   const rows = items.map(it => [
     Utilities.getUuid(), now, now, head.plantName, head.areaId, head.areaName,
     head.zoneId, head.zoneName, '', '', '',
-    it.category, it.description
+    it.category, it.kegiatan, it.kriteria
   ]);
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, JD_HEADERS_.length).setValues(rows);
   return { success: true, count: rows.length, message: rows.length + ' jobdesk berhasil disimpan.' };
@@ -79,12 +82,12 @@ function saveJobdeskBatch(payload) {
 function updateJobdeskItem(payload) {
   const id = String(payload.id || '').trim();
   if (!id) throw new Error('ID jobdesk tidak valid.');
-  const items = validateJobdeskItems_([{ category: payload.category, description: payload.description }]);
+  const items = validateJobdeskItems_([{ category: payload.category, kegiatan: payload.kegiatan, kriteria: payload.kriteria }]);
   const item = items[0];
   const sheet = ensureJobdeskSheet_();
   const row = findJobdeskRow_(sheet, id);
   sheet.getRange(row, 3).setValue(new Date());
-  sheet.getRange(row, 12, 1, 2).setValues([[item.category, item.description]]);
+  sheet.getRange(row, 12, 1, 3).setValues([[item.category, item.kegiatan, item.kriteria]]);
   return { success: true, message: 'Jobdesk berhasil diperbarui.' };
 }
 
@@ -131,6 +134,37 @@ function setupJobdeskHeaders() {
   Logger.log('Header JOBDESK siap.');
 }
 
+function migrateJobdeskToKegiatanKriteria() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_JOB);
+  if (!sheet || sheet.getLastRow() === 0) {
+    Logger.log('Sheet JOBDESK kosong. Jalankan setupJobdeskHeaders() untuk membuat header baru.');
+    return;
+  }
+  const lastCol = Math.max(sheet.getMaxColumns(), JD_HEADERS_.length);
+  const header = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0]
+    .map(v => String(v || '').trim().toUpperCase());
+  if (header[12] === 'KEGIATAN' && header[13] === 'KRITERIA') {
+    Logger.log('Sheet JOBDESK sudah termigrasi (KEGIATAN & KRITERIA). Tidak ada yang diubah.');
+    return;
+  }
+  if (header[11] !== 'CATEGORY' || header[12] !== 'DESCRIPTION') {
+    throw new Error('Struktur header JOBDESK tidak dikenali. Kolom L harus CATEGORY dan M harus DESCRIPTION.');
+  }
+  if (sheet.getMaxColumns() < JD_HEADERS_.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), JD_HEADERS_.length - sheet.getMaxColumns());
+  }
+  sheet.getRange(1, 13).setValue('KEGIATAN');
+  sheet.getRange(1, 14).setValue('KRITERIA');
+  const last = sheet.getLastRow();
+  if (last >= 2) {
+    sheet.getRange(2, 14, last - 1, 1).clearContent();
+  }
+  writeJobdeskHeaders_(sheet);
+  SpreadsheetApp.flush();
+  Logger.log('Migrasi JOBDESK selesai: DESCRIPTION menjadi KEGIATAN, KRITERIA dikosongkan. Total ' + Math.max(last - 1, 0) + ' baris.');
+}
+
 function ensureJobdeskSheet_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sheet = ss.getSheetByName(SHEET_JOB);
@@ -170,13 +204,14 @@ function writeJobdeskHeaders_(sheet) {
   sheet.setColumnWidth(11, 90);
   sheet.setColumnWidth(12, 120);
   sheet.setColumnWidth(13, 420);
+  sheet.setColumnWidth(14, 420);
   sheet.getRange(2, 10, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat('@');
   SpreadsheetApp.flush();
 }
 
 function validateJobdeskHeaders_(sheet) {
   if (sheet.getMaxColumns() < JD_HEADERS_.length) {
-    throw new Error('Kolom JOBDESK kurang dari A-M. Backup spreadsheet lalu jalankan setupJobdeskHeaders().');
+    throw new Error('Kolom JOBDESK kurang dari A-N. Backup spreadsheet lalu jalankan setupJobdeskHeaders().');
   }
   const actual = sheet.getRange(1, 1, 1, JD_HEADERS_.length).getDisplayValues()[0];
   const errors = JD_HEADERS_.filter((wanted, i) => String(actual[i] || '').trim() !== wanted);
@@ -204,11 +239,15 @@ function validateJobdeskItems_(items) {
   const out = [];
   list.forEach(it => {
     const category = String(it && it.category || '').toUpperCase().trim();
-    const description = String(it && it.description || '').trim();
-    if (!description) return;
+    const kegiatan = String(it && it.kegiatan || '').trim();
+    const kriteria = String(it && it.kriteria || '').trim();
+    if (!kegiatan && !kriteria) return;
     if (JD_CATEGORIES_.indexOf(category) < 0) throw new Error('Kategori 6S tidak valid: ' + category);
-    if (description.length > 1000) throw new Error('Deskripsi jobdesk maksimal 1000 karakter.');
-    out.push({ category: category, description: description });
+    if (!kegiatan) throw new Error('Kegiatan jobdesk wajib diisi.');
+    if (!kriteria) throw new Error('Kriteria jobdesk wajib diisi.');
+    if (kegiatan.length > 1000) throw new Error('Kegiatan maksimal 1000 karakter.');
+    if (kriteria.length > 1000) throw new Error('Kriteria maksimal 1000 karakter.');
+    out.push({ category: category, kegiatan: kegiatan, kriteria: kriteria });
   });
   if (!out.length) throw new Error('Isi minimal satu jobdesk.');
   return out;

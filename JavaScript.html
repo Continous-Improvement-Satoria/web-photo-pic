@@ -9,14 +9,6 @@ const GROUPS = [
   { k: 'A', n: 'GRUP A', c: '#1f5a8a' }, { k: 'B', n: 'GRUP B', c: '#1e8a4c' },
   { k: 'C', n: 'GRUP C', c: '#e8651a' }, { k: 'D', n: 'GRUP D', c: '#7b3fa0' }
 ];
-const CAT_LABEL = {
-  RINGKAS: 'RINGKAS', RAPI: 'RAPI', RESIK: 'RESIK',
-  RAWAT: 'RAWAT', RAJIN: 'RAJIN', SAFETY: 'KESELAMATAN'
-};
-function catLabel(k) {
-  const key = String(k || '').toUpperCase();
-  return CAT_LABEL[key] || key;
-}
 
 /* ---------- INIT ---------- */
 window.addEventListener('load', () => {
@@ -268,26 +260,59 @@ function picCard(p) {
     ${!p.photo && p.err ? `<div class="dp" style="color:#c62828">Foto gagal: ${esc(p.err).substring(0, 80)}</div>` : ''}</div>`;
 }
 
-function hideGroupD(info) {
+function isLine3(info) {
   const pid = String(info.plantId || '').toUpperCase();
   const pname = String(info.plantName || '').toUpperCase().replace(/\s+/g, ' ').trim();
   return pid === 'A03' || pname === 'PLANT 3' || pname === 'LINE 3';
 }
 
+function isNoGroupArea(info) {
+  const aname = String(info.areaName || '').toUpperCase();
+  return isLine3(info) && aname.indexOf('PACKAGING') >= 0;
+}
+
+function hideGroupD(info) {
+  return isLine3(info);
+}
+
 function jobdeskBoardHtml(jds) {
-  const rows = jds.map(j => {
-    const cat = String(j.category || '').toUpperCase();
-    return `<div class="jd-board-item">
-      <span class="cat-badge cat-${esc(cat.toLowerCase())}">${esc(catLabel(cat))}</span>
-      <div class="jd-board-desc">${esc(j.description)}</div>
-    </div>`;
-  }).join('');
-  return `<div class="jd-board-list">${rows}</div>`;
+  const rows = jds.map(j => `<tr>
+      <td class="jd-board-kegiatan">${esc(j.kegiatan)}</td>
+      <td class="jd-board-kriteria">${esc(j.kriteria) || '-'}</td>
+    </tr>`).join('');
+  return `<table class="jd-board-table">
+    <thead><tr><th>Kegiatan</th><th>Kriteria</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
 }
 
 function buildBoard(d) {
   const i = d.info;
   const jds = Array.isArray(d.jobdesks) ? d.jobdesks : [];
+  const upd = d.updated ? new Date(d.updated).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
+  const head = `
+    <div class="bd-head">
+      <div><h2>KEPEMILIKAN &amp; TANGGUNG JAWAB AREA</h2><span class="bd-tag">AREA KITA · TANGGUNG JAWAB KITA · KEBANGGAAN KITA</span></div>
+      <div class="bd-badge">MANAJEMEN<br>6S</div>
+    </div>
+    <div class="bd-zone">${esc(i.plantName)} · ${esc(i.areaName)} · ${esc(i.zoneName)}</div>`;
+  const infoBox = `<div class="bd-info"><b>INFO ZONA</b>
+        Plant: ${esc(i.plantName)}<br>Area: ${esc(i.areaName)}<br>Zona: ${esc(i.zoneName)}<br>Pembaruan: ${upd}</div>`;
+  const foot = `<div class="bd-foot"><span><b>SEIRI</b> RINGKAS</span><span><b>SEITON</b> RAPI</span><span><b>SEISO</b> RESIK</span>
+      <span><b>SEIKETSU</b> RAWAT</span><span><b>SHITSUKE</b> RAJIN</span><span><b>KESELAMATAN</b></span></div>`;
+  const jobBox = jds.length
+    ? `<div class="bd-jobdesk"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>` : '';
+
+  if (isNoGroupArea(i)) {
+    const pics = Array.isArray(d.pics) ? d.pics : [];
+    const picPanel = `<div class="bd-day bd-nogroup-pic"><h3>NON SHIFT (TIM HARIAN)</h3>
+      <div class="row">${pics.length ? pics.map(picCard).join('') : '<div class="bd-none" style="width:100%">Belum ada PIC</div>'}</div></div>`;
+    return `${head}
+    ${picPanel}
+    <div class="bd-low bd-low-single">${infoBox}</div>
+    ${jobBox}
+    ${foot}`;
+  }
+
   const groups = GROUPS.filter(g => !(hideGroupD(i) && g.k === 'D'));
   const cols = groups.map(g => {
     const ps = d.pics.filter(p => p.grup === g.k);
@@ -305,23 +330,12 @@ function buildBoard(d) {
     dayBox = `<div class="bd-day"><h3>NON SHIFT (TIM HARIAN)</h3>
       <div class="row"><div class="bd-none" style="width:100%">Belum ada PIC</div></div></div>`;
   }
-  const extraJd = (day.length && jds.length)
-    ? `<div class="bd-jobdesk"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>` : '';
-  const upd = d.updated ? new Date(d.updated).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
-  return `
-    <div class="bd-head">
-      <div><h2>KEPEMILIKAN &amp; TANGGUNG JAWAB AREA</h2><span class="bd-tag">AREA KITA · TANGGUNG JAWAB KITA · KEBANGGAAN KITA</span></div>
-      <div class="bd-badge">MANAJEMEN<br>6S</div>
-    </div>
-    <div class="bd-zone">${esc(i.plantName)} · ${esc(i.areaName)} · ${esc(i.zoneName)}</div>
+  const extraJd = (day.length && jds.length) ? jobBox : '';
+  return `${head}
     <div class="bd-groups" style="grid-template-columns:repeat(${groups.length},1fr)">${cols}</div>
-    <div class="bd-low">${dayBox}
-      <div class="bd-info"><b>INFO ZONA</b>
-        Plant: ${esc(i.plantName)}<br>Area: ${esc(i.areaName)}<br>Zona: ${esc(i.zoneName)}<br>Pembaruan: ${upd}</div>
-    </div>
+    <div class="bd-low">${dayBox}${infoBox}</div>
     ${extraJd}
-    <div class="bd-foot"><span><b>SEIRI</b> RINGKAS</span><span><b>SEITON</b> RAPI</span><span><b>SEISO</b> RESIK</span>
-      <span><b>SEIKETSU</b> RAWAT</span><span><b>SHITSUKE</b> RAJIN</span><span><b>KESELAMATAN</b></span></div>`;
+    ${foot}`;
 }
 
 
