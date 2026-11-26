@@ -157,7 +157,15 @@
       <div class="modal-bar">
         <b id="modalTitle">Pratinjau</b>
         <div>
-          <button class="btn-sm" id="btnDl" onclick="downloadBoard()">⬇️ Unduh</button>
+          <select id="dlFormat" onchange="toggleDlOptions()">
+            <option value="png">PNG Full HD</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <select id="dlOrient" style="display:none" disabled>
+            <option value="portrait">Vertical (F4)</option>
+            <option value="landscape">Landscape (F4)</option>
+          </select>
+          <button class="btn-sm" onclick="downloadBoard()">⬇️ Unduh</button>
           <button class="btn-sm ghost" onclick="closeModal()">✖ Tutup</button>
         </div>
       </div>

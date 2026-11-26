@@ -12,6 +12,7 @@ const GROUPS = [
 
 /* ---------- INIT ---------- */
 window.addEventListener('load', () => {
+  toggleDlOptions();
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       p => { GPS.lat = p.coords.latitude.toFixed(7); GPS.lng = p.coords.longitude.toFixed(7); },
@@ -252,8 +253,11 @@ function fitBoard() {
 }
 
 function picCard(p) {
+  const photoStyle = p.photo
+    ? ` style="background-image:url(&quot;${esc(p.photo)}&quot;)"`
+    : '';
   return `<div class="pic">
-    ${p.photo ? `<img class="ph" src="${p.photo}">` : '<div class="ph"></div>'}
+    <div class="ph"${photoStyle}></div>
     <div class="nm">${esc(p.name)}</div>
     <div class="id"style="color:#c62828">${p.nik ? `NIK: ${esc(p.nik)}` : 'NIK belum terisi'}</div>
     <div class="dp">${esc(p.dept)}</div>
@@ -337,84 +341,186 @@ function buildBoard(d) {
    Tidak menggambar ulang foto
    ============================================ */
 
-function downloadBoard() {
+function toggleDlOptions() {
+  const fmt = $('dlFormat');
+  const orient = $('dlOrient');
+  if (!fmt || !orient) return;
+  const isPdf = fmt.value === 'pdf';
+  orient.style.display = isPdf ? '' : 'none';
+  orient.disabled = !isPdf;
+}
 
+function boardImagesReady_(board) {
+  const images = Array.from(board.querySelectorAll('img'));
+  return images.every(img => img.complete && img.naturalWidth > 0);
+}
+
+function saveBlob_(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadBoard() {
+  const fmt = $('dlFormat') ? $('dlFormat').value : 'pdf';
+  if (fmt === 'png') {
+    downloadBoardPng();
+    return;
+  }
+  downloadBoardPdf();
+}
+
+async function downloadBoardPng() {
   if (!CUR) {
     alert('Silakan buka pratinjau zona terlebih dahulu.');
     return;
   }
 
-  const board = document.getElementById('board');
-
+  const board = $('board');
   if (!board) {
     alert('Poster tidak ditemukan.');
     return;
   }
 
-  // Pastikan semua foto telah dimuat
-  const images = Array.from(
-    board.querySelectorAll('img')
-  );
-
-  const failed = images.filter(img =>
-    !img.complete || img.naturalWidth === 0
-  );
-
-  if (failed.length > 0) {
-    alert(
-      'Ada foto yang belum selesai dimuat. ' +
-      'Silakan coba kembali.'
-    );
+  if (typeof window.html2canvas !== 'function') {
+    alert('Library PNG belum termuat. Silakan muat ulang halaman.');
     return;
   }
 
-  // Ukuran F4 dalam mm
-  const pageWidth = 210;
-  const pageHeight = 330;
+  if (!boardImagesReady_(board)) {
+    alert('Ada foto yang belum selesai dimuat. Silakan coba kembali.');
+    return;
+  }
+
+  const overlay = $('loadingOverlay');
+  const loadingText = $('loadingText');
+  const wrap = $('boardWrap');
+  const oldTransform = board.style.transform;
+  const oldZoom = board.style.zoom;
+  const oldWidth = board.style.width;
+  const oldWrapHeight = wrap ? wrap.style.height : '';
+
+  try {
+    if (overlay) {
+      loadingText.innerHTML = 'Menyiapkan PNG Full HD...<br><small>Mohon tunggu sebentar</small>';
+      overlay.style.display = 'flex';
+    }
+
+    board.style.transform = 'none';
+    board.style.zoom = '1';
+    board.style.width = '1200px';
+    if (wrap) wrap.style.height = board.scrollHeight + 'px';
+
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const w = board.offsetWidth;
+    const h = board.scrollHeight;
+    if (!w || !h) {
+      alert('Ukuran poster tidak valid.');
+      return;
+    }
+
+    const rendered = await window.html2canvas(board, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      windowWidth: Math.max(document.documentElement.clientWidth, board.scrollWidth),
+      windowHeight: Math.max(document.documentElement.clientHeight, board.scrollHeight),
+      onclone: doc => {
+        const b = doc.getElementById('board');
+        if (b) {
+          b.style.transform = 'none';
+          b.style.zoom = '1';
+        }
+      }
+    });
+
+    const blob = await new Promise(resolve =>
+      rendered.toBlob(resolve, 'image/png')
+    );
+    if (!blob) {
+      alert('Gagal membuat PNG.');
+      return;
+    }
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    saveBlob_(blob, 'poster_' + CUR.info.zoneId + '_' + stamp + '.png');
+  } catch (e) {
+    alert('Gagal membuat PNG: ' + (e && e.message ? e.message : e));
+  } finally {
+    board.style.transform = oldTransform;
+    board.style.zoom = oldZoom;
+    board.style.width = oldWidth;
+    if (wrap) wrap.style.height = oldWrapHeight;
+    if (overlay) overlay.style.display = 'none';
+  }
+}
+
+function downloadBoardPdf() {
+  if (!CUR) {
+    alert('Silakan buka pratinjau zona terlebih dahulu.');
+    return;
+  }
+
+  const board = $('board');
+  if (!board) {
+    alert('Poster tidak ditemukan.');
+    return;
+  }
+
+  if (!boardImagesReady_(board)) {
+    alert('Ada foto yang belum selesai dimuat. Silakan coba kembali.');
+    return;
+  }
+
+  const orient = $('dlOrient');
+  const landscape = orient && orient.value === 'landscape';
+  const pageWidth = landscape ? 330 : 210;
+  const pageHeight = landscape ? 210 : 330;
   const margin = 5;
 
-  // Ukuran board asli sebelum transform preview
   const boardWidth = board.offsetWidth;
   const boardHeight = board.scrollHeight;
-
   if (!boardWidth || !boardHeight) {
     alert('Ukuran poster tidak valid.');
     return;
   }
 
-  // Konversi mm ke CSS pixel
   const mmToPx = 96 / 25.4;
-
-  const availableWidth =
-    (pageWidth - margin * 2) * mmToPx;
-
-  const availableHeight =
-    (pageHeight - margin * 2) * mmToPx;
-
-  // Skala seragam agar seluruh poster
-  // masuk ke satu halaman F4
+  const availableWidth = (pageWidth - margin * 2) * mmToPx;
+  const availableHeight = (pageHeight - margin * 2) * mmToPx;
   const scale = Math.min(
     availableWidth / boardWidth,
     availableHeight / boardHeight,
     1
   ) * 0.98;
 
-  // Atur hanya skala CETAK
-  // Preview tetap seperti sebelumnya
+  let style = $('f4PageStyle');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'f4PageStyle';
+    document.head.appendChild(style);
+  }
+  style.textContent =
+    '@page { size: ' + pageWidth + 'mm ' + pageHeight + 'mm; margin:0; }';
+
   document.documentElement.style.setProperty(
     '--f4-board-width',
     boardWidth + 'px'
   );
-
   document.documentElement.style.setProperty(
     '--f4-board-scale',
     String(scale)
   );
 
-  // Pastikan style cetak telah diproses
   void board.offsetHeight;
-
-  // Cetak DOM asli menggunakan browser
   window.print();
 }
 

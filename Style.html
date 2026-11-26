@@ -80,6 +80,7 @@
   .modal-box { background:#fff; border-radius:12px; width:100%; max-width:1232px; padding:12px; }
   .modal-bar { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
   .modal-bar div { display:flex; gap:8px; }
+  .modal-bar select { width:auto; min-width:130px; padding:8px 10px; font-size:13px; border-radius:8px; }
   .board-wrap { width:100%; overflow:hidden; border-radius:8px; }
 
   /* BOARD (lebar tetap 1200px, diskalakan via JS) */
@@ -94,7 +95,7 @@
   .bd-col h3 { margin:0; background:var(--gc); color:#fff; text-align:center; padding:12px; font-size:18px; }
   .bd-col .bd-body { padding:8px; display:flex; flex-direction:column; gap:10px; min-height:200px; }
   .pic { border:1px dashed #bbb; border-radius:8px; padding:6px 4px 8px; text-align:center; width:196px; max-width:100%; align-self:center; }
-  .pic .ph { width:184px; height:184px; aspect-ratio:1/1; object-fit:cover; border-radius:4px; background:#dde3ec; display:block; margin:0 auto 6px; }
+  .pic .ph { width:184px; height:184px; aspect-ratio:184 / 184; background-color:#dde3ec; background-repeat:no-repeat; background-size:cover; background-position:center top; border-radius:4px; display:block; margin:0 auto 6px; }
   .pic .nm { font-weight:700; font-size:15px; } .pic .id { color:#1b8a3a; font-size:13px; font-weight:600; } .pic .dp { font-size:11px; color:#666; }
   .bd-none { color:#aaa; text-align:center; font-size:13px; padding:20px 0; }
   .bd-low { display:grid; grid-template-columns:3fr 1fr; gap:16px; padding:0 24px 14px; }
@@ -111,6 +112,7 @@
   .bd-jobdesk { margin:0 24px 14px; background:#fff; border:2px solid #1f5a8a; border-radius:12px; overflow:hidden; }
   .bd-jobdesk h3 { margin:0; background:#1f5a8a; color:#fff; text-align:center; padding:10px; font-size:16px; }
   .bd-nogroup-pic { margin:14px 24px; }
+  .bd-nogroup-pic .row { justify-content:center; align-content:center; }
   .bd-low-single { grid-template-columns:1fr; }
   .jd-board-table { width:100%; border-collapse:collapse; font-size:12px; }
   .jd-board-table th { background:#e8eef6; color:#1f5a8a; text-align:left; padding:6px 10px; font-size:11px; letter-spacing:.4px; text-transform:uppercase; border-bottom:2px solid #1f5a8a; }
@@ -295,9 +297,9 @@
   }
 
   /* Foto tetap proporsional */
-  #board img.ph {
-    object-fit: contain !important;
-    object-position: center center !important;
+  #board .ph {
+    background-size: cover !important;
+    background-position: center top !important;
   }
 
   /* Usahakan setiap kartu tidak terpotong */
