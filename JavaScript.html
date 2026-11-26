@@ -276,12 +276,14 @@ function hideGroupD(info) {
 }
 
 function jobdeskBoardHtml(jds) {
-  const rows = jds.map(j => `<tr>
+  const list = jds.slice(0, 5);
+  const rows = list.map((j, idx) => `<tr>
+      <td class="jd-board-menit">${idx + 1}</td>
       <td class="jd-board-kegiatan">${esc(j.kegiatan)}</td>
       <td class="jd-board-kriteria">${esc(j.kriteria) || '-'}</td>
     </tr>`).join('');
   return `<table class="jd-board-table">
-    <thead><tr><th>Kegiatan</th><th>Kriteria</th></tr></thead>
+    <thead><tr><th>Menit</th><th>Kegiatan</th><th>Deskripsi</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 }
 
@@ -319,22 +321,12 @@ function buildBoard(d) {
     return `<div class="bd-col" style="--gc:${g.c}"><h3>${g.n}</h3>
       <div class="bd-body">${ps.length ? ps.map(picCard).join('') : '<div class="bd-none">Belum ada PIC</div>'}</div></div>`;
   }).join('');
-  const day = d.pics.filter(p => p.grup === 'DT');
-  let dayBox;
-  if (day.length) {
-    dayBox = `<div class="bd-day"><h3>NON SHIFT (TIM HARIAN)</h3>
-      <div class="row">${day.map(picCard).join('')}</div></div>`;
-  } else if (jds.length) {
-    dayBox = `<div class="bd-day bd-day-jd"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>`;
-  } else {
-    dayBox = `<div class="bd-day"><h3>NON SHIFT (TIM HARIAN)</h3>
-      <div class="row"><div class="bd-none" style="width:100%">Belum ada PIC</div></div></div>`;
-  }
-  const extraJd = (day.length && jds.length) ? jobBox : '';
+  const jobBoxLeft = jds.length
+    ? `<div class="bd-day bd-day-jd"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>`
+    : `<div class="bd-day bd-day-jd"><h3>JOBDESK 6S</h3><div class="bd-none">Belum ada jobdesk</div></div>`;
   return `${head}
     <div class="bd-groups" style="grid-template-columns:repeat(${groups.length},1fr)">${cols}</div>
-    <div class="bd-low">${dayBox}${infoBox}</div>
-    ${extraJd}
+    <div class="bd-low">${jobBoxLeft}${infoBox}</div>
     ${foot}`;
 }
 

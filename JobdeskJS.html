@@ -75,7 +75,7 @@ function jdAddRow(category, kegiatan, kriteria) {
   taKri.className = 'jd-row-kriteria';
   taKri.maxLength = 1000;
   taKri.rows = 2;
-  taKri.placeholder = 'Tulis kriteria...';
+  taKri.placeholder = 'Tulis deskripsi...';
   taKri.value = kriteria || '';
   taKri.oninput = () => jdAutoGrow(taKri);
 
@@ -168,11 +168,11 @@ function jdSubmit(ev) {
     return false;
   }
   if (items.some(it => !it.kegiatan || !it.kriteria)) {
-    jdShow('Kegiatan dan Kriteria wajib diisi.', false);
+    jdShow('Kegiatan dan Deskripsi wajib diisi.', false);
     return false;
   }
   if (items.some(it => it.kegiatan.length > 1000 || it.kriteria.length > 1000)) {
-    jdShow('Kegiatan dan Kriteria maksimal 1000 karakter.', false);
+    jdShow('Kegiatan dan Deskripsi maksimal 1000 karakter.', false);
     return false;
   }
 
@@ -247,7 +247,7 @@ function jdRenderList() {
     return;
   }
   $('jdList').innerHTML = `<div class="jd-table-wrap"><table class="jd-table">
-    <thead><tr><th>Kategori</th><th>Kegiatan</th><th>Kriteria</th><th>Plant</th><th>Area</th><th>Zona</th><th>Aksi</th></tr></thead>
+    <thead><tr><th>Kategori</th><th>Kegiatan</th><th>Deskripsi</th><th>Plant</th><th>Area</th><th>Zona</th><th>Aksi</th></tr></thead>
     <tbody>${list.map(jdRowHtml).join('')}</tbody></table></div>`;
 }
 
@@ -302,9 +302,9 @@ function jdSaveEdit() {
   const kegiatan = $('jdEditKegiatan').value.trim();
   const kriteria = $('jdEditKriteria').value.trim();
   if (!kegiatan) { jdEditShow('Kegiatan wajib diisi.', false); return; }
-  if (!kriteria) { jdEditShow('Kriteria wajib diisi.', false); return; }
+  if (!kriteria) { jdEditShow('Deskripsi wajib diisi.', false); return; }
   if (kegiatan.length > 1000 || kriteria.length > 1000) {
-    jdEditShow('Kegiatan dan Kriteria maksimal 1000 karakter.', false);
+    jdEditShow('Kegiatan dan Deskripsi maksimal 1000 karakter.', false);
     return;
   }
 

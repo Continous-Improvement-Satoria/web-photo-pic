@@ -2,7 +2,7 @@
 <div class="card wide">
   <div class="header" style="margin-bottom:12px">
     <h1>Jobdesk 6S</h1>
-    <div class="sub">Rincian kegiatan &amp; kriteria 6S per Plant, Area, dan Zona</div>
+    <div class="sub">Rincian kegiatan &amp; deskripsi 6S per Plant, Area, dan Zona</div>
   </div>
 
   <form id="jdForm" onsubmit="return jdSubmit(event)">
@@ -21,7 +21,7 @@
     <select id="jdZone" required disabled><option value="">-- Pilih Zona --</option></select>
 
     <div class="jd-input-head">
-      <span>Kategori</span><span>Kegiatan</span><span>Kriteria</span><span></span>
+      <span>Kategori</span><span>Kegiatan</span><span>Deskripsi</span><span></span>
     </div>
     <div id="jdRows" class="jd-rows-wrap"></div>
     <button type="button" class="btn-sm ghost" onclick="jdAddRow()">+ Tambah Baris</button>
@@ -55,8 +55,8 @@
     <select id="jdEditCat"></select>
     <label class="req">Kegiatan</label>
     <textarea id="jdEditKegiatan" maxlength="1000" placeholder="Tulis kegiatan..."></textarea>
-    <label class="req">Kriteria</label>
-    <textarea id="jdEditKriteria" maxlength="1000" placeholder="Tulis kriteria..."></textarea>
+    <label class="req">Deskripsi</label>
+    <textarea id="jdEditKriteria" maxlength="1000" placeholder="Tulis deskripsi..."></textarea>
     <div class="jd-modal-actions">
       <button class="btn-sm ghost" type="button" onclick="jdCloseEdit()">Batal</button>
       <button class="btn-sm" type="button" id="jdBtnEditSave" onclick="jdSaveEdit()">Simpan Perubahan</button>

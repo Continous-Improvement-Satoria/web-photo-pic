@@ -244,9 +244,9 @@ function validateJobdeskItems_(items) {
     if (!kegiatan && !kriteria) return;
     if (JD_CATEGORIES_.indexOf(category) < 0) throw new Error('Kategori 6S tidak valid: ' + category);
     if (!kegiatan) throw new Error('Kegiatan jobdesk wajib diisi.');
-    if (!kriteria) throw new Error('Kriteria jobdesk wajib diisi.');
+    if (!kriteria) throw new Error('Deskripsi jobdesk wajib diisi.');
     if (kegiatan.length > 1000) throw new Error('Kegiatan maksimal 1000 karakter.');
-    if (kriteria.length > 1000) throw new Error('Kriteria maksimal 1000 karakter.');
+    if (kriteria.length > 1000) throw new Error('Deskripsi maksimal 1000 karakter.');
     out.push({ category: category, kegiatan: kegiatan, kriteria: kriteria });
   });
   if (!out.length) throw new Error('Isi minimal satu jobdesk.');
