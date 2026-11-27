@@ -281,11 +281,13 @@ function hideGroupD(info) {
 
 function jobdeskBoardHtml(jds) {
   const list = jds.slice(0, 5);
-  const rows = list.map((j, idx) => `<tr>
-      <td class="jd-board-menit">${idx + 1}</td>
-      <td class="jd-board-kegiatan">${esc(j.kegiatan)}</td>
-      <td class="jd-board-kriteria">${esc(j.kriteria) || '-'}</td>
-    </tr>`).join('');
+  const rows = list.length
+    ? list.map((j, idx) => `<tr>
+        <td class="jd-board-menit">${idx + 1}</td>
+        <td class="jd-board-kegiatan">${esc(j.kegiatan)}</td>
+        <td class="jd-board-kriteria">${esc(j.kriteria) || '-'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" class="bd-none">Belum ada jobdesk</td></tr>';
   return `<table class="jd-board-table">
     <thead><tr><th>Menit</th><th>Kegiatan</th><th>Deskripsi</th></tr></thead>
     <tbody>${rows}</tbody></table>`;
@@ -305,8 +307,7 @@ function buildBoard(d) {
         Plant: ${esc(i.plantName)}<br>Area: ${esc(i.areaName)}<br>Zona: ${esc(i.zoneName)}<br>Pembaruan: ${upd}</div>`;
   const foot = `<div class="bd-foot"><span><b>SEIRI</b> RINGKAS</span><span><b>SEITON</b> RAPI</span><span><b>SEISO</b> RESIK</span>
       <span><b>SEIKETSU</b> RAWAT</span><span><b>SHITSUKE</b> RAJIN</span><span><b>KESELAMATAN</b></span></div>`;
-  const jobBox = jds.length
-    ? `<div class="bd-jobdesk"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>` : '';
+  const jobBox = `<div class="bd-day bd-day-jd"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>`;
 
   if (isNoGroupArea(i)) {
     const pics = Array.isArray(d.pics) ? d.pics : [];
@@ -314,8 +315,7 @@ function buildBoard(d) {
       <div class="row">${pics.length ? pics.map(picCard).join('') : '<div class="bd-none" style="width:100%">Belum ada PIC</div>'}</div></div>`;
     return `${head}
     ${picPanel}
-    <div class="bd-low bd-low-single">${infoBox}</div>
-    ${jobBox}
+    <div class="bd-low">${jobBox}${infoBox}</div>
     ${foot}`;
   }
 
@@ -325,12 +325,9 @@ function buildBoard(d) {
     return `<div class="bd-col" style="--gc:${g.c}"><h3>${g.n}</h3>
       <div class="bd-body">${ps.length ? ps.map(picCard).join('') : '<div class="bd-none">Belum ada PIC</div>'}</div></div>`;
   }).join('');
-  const jobBoxLeft = jds.length
-    ? `<div class="bd-day bd-day-jd"><h3>JOBDESK 6S</h3>${jobdeskBoardHtml(jds)}</div>`
-    : `<div class="bd-day bd-day-jd"><h3>JOBDESK 6S</h3><div class="bd-none">Belum ada jobdesk</div></div>`;
   return `${head}
     <div class="bd-groups" style="grid-template-columns:repeat(${groups.length},1fr)">${cols}</div>
-    <div class="bd-low">${jobBoxLeft}${infoBox}</div>
+    <div class="bd-low">${jobBox}${infoBox}</div>
     ${foot}`;
 }
 

@@ -260,6 +260,14 @@ function getZoneList() {
   }).sort((x, y) => (x.plantId + x.areaId + x.zoneId).localeCompare(y.plantId + y.areaId + y.zoneId));
 }
 
+function isPackagingLine3Info_(info) {
+  const pid = String(info.plantId || '').toUpperCase();
+  const pname = String(info.plantName || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const aname = String(info.areaName || '').toUpperCase();
+  const line3 = pid === 'A03' || pname === 'PLANT 3' || pname === 'LINE 3';
+  return line3 && aname.indexOf('PACKAGING') >= 0;
+}
+
 function getZoneBoard(zoneId) {
   const list = getZoneList();
   const info = list.filter(z => z.zoneId === zoneId)[0];
@@ -270,7 +278,13 @@ function getZoneBoard(zoneId) {
       const f = photoDataUrl_(p.url);
       return { name: p.name, nik: p.nik, dept: p.dept, grup: p.grup, photo: f.data, err: f.err };
     });
-  const jobdesks = typeof getZoneJobdesks_ === 'function' ? getZoneJobdesks_(zoneId) : [];
+  let jobdesks = [];
+  if (isPackagingLine3Info_(info) && typeof getAreaJobdesks_ === 'function') {
+    jobdesks = getAreaJobdesks_(info.areaId);
+  }
+  if (!jobdesks.length && typeof getZoneJobdesks_ === 'function') {
+    jobdesks = getZoneJobdesks_(zoneId);
+  }
   const jobUpdated = jobdesks.reduce((max, j) => Math.max(max, j.updatedAt || 0), 0);
   return { info, pics, jobdesks, updated: Math.max(info.last || 0, jobUpdated) };
 }
@@ -460,6 +474,48 @@ function updatePicPhoto(payload) {
     url: upload.url,
     thumb: driveThumb_(upload.url, 400)
   };
+}
+
+function deletePicData(row) {
+  const sheet = picSheet_();
+  const r = parseInt(row, 10);
+  if (!r || r < 2 || r > sheet.getLastRow()) throw new Error('Baris data tidak valid.');
+
+  const headers = sheet.getRange(1, 1, 1, PIC_HEADERS_.length).getDisplayValues()[0];
+  const hm = hmap_(headers);
+  const last = sheet.getLastRow();
+  const values = sheet.getRange(1, 1, last, PIC_HEADERS_.length).getValues();
+  const display = sheet.getRange(1, 1, last, PIC_HEADERS_.length).getDisplayValues();
+  const I = k => idx_(hm, k);
+
+  const target = values[r - 1];
+  const zoneId = String(target[I('zoneId')] || '').trim();
+  const nik = cleanNik_(display[r - 1][I('nik')]);
+  const name = String(target[I('name')] || '').trim().toLowerCase();
+  if (!zoneId) throw new Error('Data PIC tidak valid.');
+  const key = zoneId + '|' + (nik || name);
+
+  let deleted = 0;
+  for (let i = last; i >= 2; i--) {
+    const rowVals = values[i - 1];
+    const rowZone = String(rowVals[I('zoneId')] || '').trim();
+    const rowNik = cleanNik_(display[i - 1][I('nik')]);
+    const rowName = String(rowVals[I('name')] || '').trim().toLowerCase();
+    const rowKey = rowZone + '|' + (rowNik || rowName);
+    if (rowKey !== key) continue;
+
+    const url = String(rowVals[I('url')] || '');
+    sheet.deleteRow(i);
+    deleted++;
+
+    const id = driveFileId_(url);
+    if (id) {
+      try { DriveApp.getFileById(id).setTrashed(true); }
+      catch (e) { console.warn('Foto lama tidak dapat dihapus: ' + (e && e.message ? e.message : e)); }
+    }
+  }
+  SpreadsheetApp.flush();
+  return { success: true, message: 'Data PIC berhasil dihapus (' + deleted + ' baris).' };
 }
 
 // Jalankan manual dari editor untuk cek data: debugZone('1BS5')

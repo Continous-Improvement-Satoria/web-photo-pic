@@ -95,7 +95,7 @@
   .bd-col h3 { margin:0; background:var(--gc); color:#fff; text-align:center; padding:12px; font-size:18px; }
   .bd-col .bd-body { padding:8px; display:flex; flex-direction:column; gap:10px; min-height:200px; }
   .pic { border:1px dashed #bbb; border-radius:8px; padding:6px 4px 8px; text-align:center; width:196px; max-width:100%; align-self:center; }
-  .pic .ph { width:184px; height:184px; aspect-ratio:184 / 184; background-color:#dde3ec; background-repeat:no-repeat; background-size:cover; background-position:center top; border-radius:4px; display:block; margin:0 auto 6px; }
+  .pic .ph { width:184px; height:184px; aspect-ratio:184 / 184; background-color:#dde3ec; background-repeat:no-repeat; background-size:cover; background-position:center center; border-radius:4px; display:block; margin:0 auto 6px; }
   .pic .nm { font-weight:700; font-size:15px; } .pic .id { color:#1b8a3a; font-size:13px; font-weight:600; } .pic .dp { font-size:11px; color:#666; }
   .bd-none { color:#aaa; text-align:center; font-size:13px; padding:20px 0; }
   .bd-low { display:grid; grid-template-columns:3fr 1fr; gap:16px; padding:0 24px 14px; }
@@ -170,13 +170,14 @@
   .pc-zone { font-size:12px; font-weight:600; color:#0d47a1; }
   .pc-plant { font-size:11px; color:#78909c; }
   .pc-badge { display:inline-block; font-size:10px; font-weight:800; padding:2px 7px; border-radius:20px; background:var(--primary-color); color:#fff; }
-  .pc-actions { display:flex; gap:8px; margin-top:auto; }
-  .pc-actions .btn-sm { flex:1; }
+  .pc-actions { display:flex; gap:8px; margin-top:auto; flex-wrap:wrap; }
+  .pc-actions .btn-sm { flex:1 1 auto; }
 
   /* CROP FOTO */
   .crop-box { max-width:560px; }
   .crop-stage { width:100%; height:min(62vh,460px); background:#0b0b0b; border-radius:10px; overflow:hidden; }
   .crop-stage #cropImage { display:block; max-width:100%; }
+  .foto-source-bar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
   .crop-tools { display:flex; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
   .crop-zoom-label { font-size:12px; font-weight:700; color:#546e7a; margin:0; }
   .crop-tools input[type=range] { flex:1; min-width:120px; }
@@ -299,7 +300,7 @@
   /* Foto tetap proporsional */
   #board .ph {
     background-size: cover !important;
-    background-position: center top !important;
+    background-position: center center !important;
   }
 
   /* Usahakan setiap kartu tidak terpotong */

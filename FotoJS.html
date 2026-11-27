@@ -5,20 +5,22 @@ let PIC_EDIT = null;
 let PIC_CROP = null;
 let CROPPER = null;
 let CROP_ZOOM_LAST = 0;
+let CROP_OBJECT_URL = null;
 
 /* ---------- INIT ---------- */
 function initFoto() {
-  fotoEnsureMaster(() => {
-    fotoFillPlantFilter();
-    if (!PIC_LOADED) fotoLoadList();
-  });
+  fotoEnsureMaster(() => fotoFillPlantFilter());
+  if (!PIC_LOADED) fotoLoadList();
 }
 
 function fotoEnsureMaster(cb) {
   if (typeof MASTER !== 'undefined' && MASTER && MASTER.plants && MASTER.plants.length) { cb(); return; }
   google.script.run
     .withSuccessHandler(d => { MASTER = d || { plants: [], areas: [], zones: [] }; cb(); })
-    .withFailureHandler(e => fotoShow('Gagal memuat data master: ' + e.message, false))
+    .withFailureHandler(e => {
+      const msg = e && e.message ? e.message : String(e || '');
+      fotoShow('Gagal memuat data master: ' + msg, false);
+    })
     .getMasterData();
 }
 
@@ -44,10 +46,16 @@ function fotoLoadList() {
     .withSuccessHandler(items => {
       PIC_ITEMS = Array.isArray(items) ? items : [];
       PIC_LOADED = true;
-      fotoRenderList();
+      try {
+        fotoRenderList();
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err || '');
+        $('picList').innerHTML = `<div class="empty">Gagal menampilkan data PIC: ${esc(msg)}</div>`;
+      }
     })
     .withFailureHandler(e => {
-      $('picList').innerHTML = `<div class="empty">Gagal memuat data PIC: ${esc(e.message)}</div>`;
+      const msg = e && e.message ? e.message : String(e || '');
+      $('picList').innerHTML = `<div class="empty">Gagal memuat data PIC: ${esc(msg)}</div>`;
     })
     .getPicList();
 }
@@ -83,8 +91,9 @@ function fotoCardHtml(it) {
       <div class="pc-plant">${esc(it.plant)} · ${esc(it.areaId)} — ${esc(it.areaName)}</div>
     </div>
     <div class="pc-actions">
-      <button class="btn-sm ghost" type="button" onclick="fotoOpenEdit(${it.row})">✏️ Edit</button>
-      <button class="btn-sm" type="button" onclick="fotoOpenCrop(${it.row})">🖼️ Ganti Foto</button>
+      <button class="btn-sm ghost" type="button" onclick="fotoOpenEdit(${it.row})">✏️ Edit Data</button>
+      <button class="btn-sm" type="button" onclick="fotoOpenCrop(${it.row})">📷 Edit Foto</button>
+      <button class="btn-sm danger" type="button" onclick="fotoDelete(${it.row})">🗑️ Hapus Data</button>
     </div>
   </div>`;
 }
@@ -227,6 +236,28 @@ function fotoSaveEdit() {
     .updatePicData(payload);
 }
 
+function fotoDelete(row) {
+  const it = PIC_ITEMS.find(x => x.row === row);
+  if (!it) return;
+  const label = it.nik ? `${it.name} (NIK ${it.nik})` : (it.name || 'PIC ini');
+  if (!window.confirm('Hapus data ' + label + '? Foto di Drive juga akan dihapus.')) return;
+
+  $('loadingText').innerHTML = 'Menghapus data PIC...<br><small>Mohon tunggu sebentar</small>';
+  $('loadingOverlay').style.display = 'flex';
+
+  google.script.run
+    .withSuccessHandler(r => {
+      $('loadingOverlay').style.display = 'none';
+      fotoShow(r.message || 'Data PIC berhasil dihapus.', true);
+      fotoLoadList();
+    })
+    .withFailureHandler(e => {
+      $('loadingOverlay').style.display = 'none';
+      fotoShow('Gagal menghapus: ' + e.message, false);
+    })
+    .deletePicData(row);
+}
+
 /* ---------- CROP FOTO ---------- */
 function fotoCropMsg(text, ok) {
   const m = $('cropMsg');
@@ -238,11 +269,22 @@ function fotoOpenCrop(row) {
   const it = PIC_ITEMS.find(x => x.row === row);
   if (!it) return;
   PIC_CROP = it;
+  $('cropModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  fotoLoadExistingPhoto();
+}
+
+function fotoLoadExistingPhoto() {
+  if (!PIC_CROP) return;
+  releaseCropObjectUrl();
+  const row = PIC_CROP.row;
   CROP_ZOOM_LAST = 0;
   $('cropZoom').value = 0;
   $('cropMsg').className = 'msg';
   $('cropMsg').textContent = '';
   $('cropBtnSave').disabled = false;
+  $('cropFileCamera').value = '';
+  $('cropFileGallery').value = '';
 
   $('loadingText').innerHTML = 'Menyiapkan foto...<br><small>Mengambil foto dari Drive</small>';
   $('loadingOverlay').style.display = 'flex';
@@ -250,14 +292,40 @@ function fotoOpenCrop(row) {
   google.script.run
     .withSuccessHandler(r => {
       $('loadingOverlay').style.display = 'none';
-      if (!r || !r.data) { alert('Foto tidak dapat dimuat.'); return; }
+      if ($('cropModal').style.display === 'none') return;
+      if (!r || !r.data) { fotoCropMsg('Foto tidak dapat dimuat.', false); return; }
       fotoShowCrop(r.data);
     })
     .withFailureHandler(e => {
       $('loadingOverlay').style.display = 'none';
-      alert('Gagal memuat foto: ' + e.message);
+      fotoCropMsg('Gagal memuat foto: ' + e.message, false);
     })
     .getPicPhoto(row);
+}
+
+function releaseCropObjectUrl() {
+  if (CROP_OBJECT_URL) {
+    URL.revokeObjectURL(CROP_OBJECT_URL);
+    CROP_OBJECT_URL = null;
+  }
+}
+
+function fotoPickNewPhoto(input) {
+  if (!PIC_CROP || !input.files || !input.files.length) return;
+  const file = input.files[0];
+  if (!/^image\//.test(file.type)) {
+    fotoCropMsg('File harus berupa gambar.', false);
+    return;
+  }
+  releaseCropObjectUrl();
+  CROP_OBJECT_URL = URL.createObjectURL(file);
+  CROP_ZOOM_LAST = 0;
+  $('cropZoom').value = 0;
+  $('cropMsg').className = 'msg';
+  $('cropMsg').textContent = '';
+  $('cropBtnSave').disabled = false;
+  fotoShowCrop(CROP_OBJECT_URL);
+  input.value = '';
 }
 
 function fotoShowCrop(dataUrl) {
@@ -314,6 +382,9 @@ function fotoCloseCrop() {
   $('cropModal').style.display = 'none';
   document.body.style.overflow = '';
   if (CROPPER) { CROPPER.destroy(); CROPPER = null; }
+  releaseCropObjectUrl();
+  $('cropFileCamera').value = '';
+  $('cropFileGallery').value = '';
   PIC_CROP = null;
 }
 

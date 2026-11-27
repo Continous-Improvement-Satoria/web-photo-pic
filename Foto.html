@@ -92,8 +92,16 @@
   <div id="cropModal" class="modal" style="display:none">
     <div class="modal-box crop-box">
       <div class="modal-bar">
-        <b>Atur Foto Profil (Kotak 1:1)</b>
+        <b>Edit Foto PIC (Kotak 1:1)</b>
         <button class="btn-sm ghost" type="button" onclick="fotoCloseCrop()">✖ Tutup</button>
+      </div>
+
+      <div class="foto-source-bar">
+        <button class="btn-sm ghost" type="button" onclick="fotoLoadExistingPhoto()">Foto Saat Ini</button>
+        <label class="btn-sm ghost" for="cropFileCamera">📷 Kamera</label>
+        <label class="btn-sm ghost" for="cropFileGallery">🖼️ Galeri</label>
+        <input type="file" id="cropFileCamera" class="hidden-file" accept="image/*" capture="environment" onchange="fotoPickNewPhoto(this)">
+        <input type="file" id="cropFileGallery" class="hidden-file" accept="image/*" onchange="fotoPickNewPhoto(this)">
       </div>
 
       <div class="crop-stage">

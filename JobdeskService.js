@@ -39,20 +39,22 @@ function getJobdeskList() {
   })).filter(x => x.id);
 }
 
+function sortJobdesks_(a, b) {
+  const ca = JD_CATEGORIES_.indexOf(a.category);
+  const cb = JD_CATEGORIES_.indexOf(b.category);
+  const oa = ca < 0 ? 99 : ca;
+  const ob = cb < 0 ? 99 : cb;
+  if (oa !== ob) return oa - ob;
+  return (a.updatedAt || 0) - (b.updatedAt || 0);
+}
+
 function getZoneJobdesks_(zoneId) {
   const key = String(zoneId || '').trim();
   if (!key) return [];
   try {
     return getJobdeskList()
-      .filter(it => it.zoneId === key)
-      .sort((a, b) => {
-        const ca = JD_CATEGORIES_.indexOf(a.category);
-        const cb = JD_CATEGORIES_.indexOf(b.category);
-        const oa = ca < 0 ? 99 : ca;
-        const ob = cb < 0 ? 99 : cb;
-        if (oa !== ob) return oa - ob;
-        return (a.updatedAt || 0) - (b.updatedAt || 0);
-      })
+      .filter(it => String(it.zoneId || '').trim() === key)
+      .sort(sortJobdesks_)
       .map(it => ({
         category: it.category,
         kegiatan: it.kegiatan,
@@ -61,6 +63,32 @@ function getZoneJobdesks_(zoneId) {
       }));
   } catch (e) {
     console.warn('Jobdesk zona ' + key + ' tidak dapat dimuat: ' + (e && e.message ? e.message : e));
+    return [];
+  }
+}
+
+function getAreaJobdesks_(areaId) {
+  const key = String(areaId || '').trim();
+  if (!key) return [];
+  try {
+    const seen = {};
+    return getJobdeskList()
+      .filter(it => String(it.areaId || '').trim() === key)
+      .sort(sortJobdesks_)
+      .filter(it => {
+        const k = [it.category, it.kegiatan, it.kriteria].join('|');
+        if (seen[k]) return false;
+        seen[k] = 1;
+        return true;
+      })
+      .map(it => ({
+        category: it.category,
+        kegiatan: it.kegiatan,
+        kriteria: it.kriteria,
+        updatedAt: it.updatedAt
+      }));
+  } catch (e) {
+    console.warn('Jobdesk area ' + key + ' tidak dapat dimuat: ' + (e && e.message ? e.message : e));
     return [];
   }
 }
